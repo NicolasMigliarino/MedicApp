@@ -21,6 +21,8 @@ import HistorialClinico from './components/HistorialClinico';
 import TurnosForm from './components/TurnosForm';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
+import Soporte from './components/Soporte';
+import Privacidad from './components/Privacidad';
 
 
 import ProtectedRoute from './components/ProtectedRoute';
@@ -361,6 +363,8 @@ function App() {
             <Route path="/turnos" element={<TurnosList />} />
             <Route path="/turnos/nuevo" element={<TurnosForm />} />
             <Route path="/turnos/editar/:id" element={<TurnosForm />} />
+            <Route path="/soporte" element={<Soporte />} />
+            <Route path="/privacidad" element={<Privacidad />} />
           </Route>
 
           {/* ==========================================

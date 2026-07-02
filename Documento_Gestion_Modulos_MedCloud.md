@@ -1,4 +1,4 @@
-﻿# Guía de Gestión por Módulos — MedCloud
+# Guía de Gestión por Módulos — MedCloud
 
 **Destinatario:** Cliente / Gerencia / Personal operativo del centro médico  
 **Versión:** 1.0  
@@ -364,13 +364,49 @@ Registro digital privado de las consultas médicas: evoluciones, diagnósticos, 
 Gestiona las cuentas de acceso al sistema (credenciales de login).
 
 | Campo | Descripción |
-|-------|-------------|
+|---|---|
 | Username | Nombre único para iniciar sesión. |
 | Email | Correo del operador. |
 | Rol | ADMIN, RECEPCIÓN o MÉDICO. |
 | Estado | Activo / Inactivo. |
 
-**Operaciones:** Alta, edición, desactivación y cambio de contraseña de usuarios.
+#### 11.1.1. Proceso de Alta de Usuarios
+
+El sistema admite dos métodos de registro en la base de datos:
+
+1. **Alta Manual por Administrador**:
+   - Se realiza desde el menú **Usuarios** haciendo clic en **Nuevo Usuario**.
+   - Se completan los campos de nombre de usuario (`username`), correo (`email`), rol asociado y estado inicial (activo/inactivo).
+   - La base de datos valida automáticamente que tanto el `username` como el `email` sean únicos en el sistema. Si se intenta registrar un valor repetido, el sistema arroja un error y no permite guardar.
+
+2. **Alta Automática de Médicos**:
+   - Al registrar un nuevo médico en el módulo de **Profesionales**, el sistema crea automáticamente su cuenta de usuario.
+   - **Nombre de usuario auto-generado**: Se compone de la inicial del nombre y el apellido completo en minúsculas (ej. María López -> `mlopez`). Si ya existiera un usuario con ese nombre, el sistema le añade un número secuencial (ej. `mlopez1`).
+   - **Email provisional**: Se genera una casilla temporal ficticia con formato `nombreusuario@MedCloud.local`.
+   - **Contraseña provisoria**: Por defecto se le asigna su número de DNI/CUIL.
+   - **Cambio de contraseña forzado**: El usuario se crea con la bandera de "Cambio Obligatorio" (`debe_cambiar_pass = 1`) activada, requiriendo definir una clave propia al ingresar por primera vez.
+
+#### 11.1.2. Gestión de Contraseñas
+
+La seguridad de las contraseñas se gestiona mediante reglas estrictas y un flujo automatizado de recuperación:
+
+* **Primer Inicio de Sesión**:
+  - Al ingresar por primera vez con credenciales temporales (como en el alta automática de médicos), el sistema detecta que el usuario tiene activado el requerimiento de cambio (`debe_cambiar_pass = 1`).
+  - Se bloquea la navegación general y se despliega una pantalla que obliga al usuario a ingresar una nueva contraseña personal.
+  - **Validación de cambio**: El sistema limpia la contraseña de espacios vacíos en los extremos y valida que la nueva contraseña no sea idéntica a la anterior. De ser igual, se muestra un mensaje de error impidiendo el registro. Tras un cambio exitoso, el usuario puede operar con normalidad.
+
+* **Cambio Voluntario de Contraseña**:
+  - Un administrador puede actualizar o cambiar la contraseña de cualquier usuario ingresando a la edición de la cuenta en el menú **Usuarios**.
+
+* **Recuperación Autónoma por Email (Forgot Password)**:
+  - Si un usuario no recuerda su contraseña, puede restablecerla de forma segura desde la pantalla de inicio de sesión:
+    1. Hace clic en **"¿Olvidaste tu contraseña?"** en el Login.
+    2. Ingresa su correo electrónico registrado.
+    3. **Envío de enlace**: Si el correo es válido y pertenece a un usuario activo, el sistema genera un token seguro y temporal en la base de datos (con validez de 1 hora) e invalida cualquier solicitud previa. Se le envía al usuario un correo con formato HTML que contiene un botón de restablecimiento.
+    4. **Seguridad contra enumeración**: Si el correo ingresado no existiera en el sistema, el mensaje en pantalla será idéntico al de éxito (evitando que un atacante descubriéndolo mediante prueba y error sepa qué correos están registrados).
+    5. **Restablecimiento**: Al hacer clic en el botón del correo, el usuario es redirigido a una pantalla especial en MedCloud para ingresar su nueva contraseña (de mínimo 4 caracteres). Una vez guardada, el token se marca como usado e inválido, permitiendo al usuario iniciar sesión con la nueva clave.
+
+**Operaciones generales:** Alta, edición, desactivación y cambio de contraseña de usuarios.
 
 ### 11.2. Roles
 

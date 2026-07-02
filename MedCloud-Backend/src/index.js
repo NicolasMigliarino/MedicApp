@@ -16,6 +16,7 @@ const authRoutes = require('./routes/auth.routes');
 const archivosRoutes = require('./routes/archivos.routes');
 const cajaRoutes = require('./routes/caja.routes');
 const passwordResetRoutes = require('./routes/passwordReset.routes');
+const soporteRoutes = require('./routes/soporte.routes');
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use(authRoutes);
 app.use(archivosRoutes);
 app.use(cajaRoutes);
 app.use(passwordResetRoutes);
+app.use(soporteRoutes);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 const { iniciarScheduler } = require('./utils/scheduler');
 

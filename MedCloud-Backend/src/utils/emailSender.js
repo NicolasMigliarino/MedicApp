@@ -164,7 +164,100 @@ const sendDoctorAgendaEmail = async (profesionalNombre, profesionalEmail, fechaL
     return transporter.sendMail(mailOptions);
 };
 
+const buildSupportEmailHTML = (username, rol, category, subject, description, contactEmail, dateStr) => {
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin:0; padding:0; background-color:#f8fafc; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc; padding:40px 0;">
+            <tr>
+                <td align="center">
+                    <table width="550" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,0.05); overflow:hidden; border: 1px solid #e2e8f0;">
+                        <!-- Header con gradiente corporativo -->
+                        <tr>
+                            <td style="background:linear-gradient(135deg,#6366f1,#4f46e5); padding:28px 36px; text-align:center;">
+                                <h1 style="color:#ffffff; margin:0; font-size:24px; font-weight:700; letter-spacing:-0.5px;">Soporte MedCloud</h1>
+                                <p style="color:rgba(255,255,255,0.85); margin:6px 0 0; font-size:14px;">Nuevo reporte de incidente / feedback</p>
+                            </td>
+                        </tr>
+                        <!-- Cuerpo del email -->
+                        <tr>
+                            <td style="padding:32px 36px;">
+                                <h2 style="color:#1e293b; margin:0 0 16px; font-size:18px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px;">Detalles del Reporte</h2>
+                                
+                                <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                                    <tr>
+                                        <td style="padding: 6px 0; font-size:14px; color:#64748b; width: 140px;"><strong>Categoría:</strong></td>
+                                        <td style="padding: 6px 0; font-size:14px; color:#1e293b;"><span style="background-color:#e0e7ff; color:#3730a3; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; text-transform: uppercase;">${category}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 6px 0; font-size:14px; color:#64748b;"><strong>Asunto:</strong></td>
+                                        <td style="padding: 6px 0; font-size:14px; color:#1e293b; font-weight: 600;">${subject}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 6px 0; font-size:14px; color:#64748b;"><strong>Fecha de envío:</strong></td>
+                                        <td style="padding: 6px 0; font-size:14px; color:#1e293b;">${dateStr}</td>
+                                    </tr>
+                                </table>
+
+                                <h3 style="color:#1e293b; margin:0 0 8px; font-size:15px;">Descripción del problema / feedback:</h3>
+                                <div style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; color:#334155; font-size:14px; line-height:1.6; white-space: pre-wrap; margin-bottom: 24px;">
+                                    ${description}
+                                </div>
+
+                                <h2 style="color:#1e293b; margin:0 0 12px; font-size:16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">Información del Remitente</h2>
+                                <table width="100%" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td style="padding: 4px 0; font-size:14px; color:#64748b; width: 140px;"><strong>Usuario:</strong></td>
+                                        <td style="padding: 4px 0; font-size:14px; color:#1e293b;">${username}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 4px 0; font-size:14px; color:#64748b;"><strong>Rol:</strong></td>
+                                        <td style="padding: 4px 0; font-size:14px; color:#1e293b; text-transform: uppercase; font-size: 12px;">${rol}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 4px 0; font-size:14px; color:#64748b;"><strong>Email de respuesta:</strong></td>
+                                        <td style="padding: 4px 0; font-size:14px; color:#1e293b;"><a href="mailto:${contactEmail}" style="color:#4f46e5; text-decoration: none; font-weight: 600;">${contactEmail}</a></td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background-color:#f8fafc; padding:16px 36px; border-top:1px solid #e2e8f0; text-align:center;">
+                                <p style="color:#94a3b8; font-size:11px; margin:0;">
+                                    Este correo fue generado automáticamente desde la plataforma de gestión MedCloud.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>`;
+};
+
+const sendSupportTicketEmail = async (username, rol, category, subject, description, contactEmail) => {
+    const destination = 'nmigliarino@gmail.com';
+    const dateStr = new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+    const mailOptions = {
+        from: `"MedCloud Soporte" <${process.env.SMTP_USER || 'noreply@medcloud.com'}>`,
+        to: destination,
+        replyTo: contactEmail,
+        subject: `🚨 [SOPORTE MEDCLOUD] ${category.toUpperCase()}: ${subject}`,
+        html: buildSupportEmailHTML(username, rol, category, subject, description, contactEmail, dateStr)
+    };
+
+    return transporter.sendMail(mailOptions);
+};
+
 module.exports = { 
     sendPatientReminderEmail,
-    sendDoctorAgendaEmail
+    sendDoctorAgendaEmail,
+    sendSupportTicketEmail
 };

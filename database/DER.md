@@ -1,4 +1,4 @@
-﻿# Especificación del Modelo Entidad-Relación (DER) - MedCloud
+# Especificación del Modelo Entidad-Relación (DER) - MedCloud
 
 Este documento describe detalladamente la estructura de la base de datos de **MedCloud** implementada en Microsoft SQL Server. Toda la lógica de mutación de datos se encuentra encapsulada en **Stored Procedures (Procedimientos Almacenados)** para garantizar la integridad referencial, consistencia de negocio, rendimiento y seguridad de las operaciones.
 
@@ -382,6 +382,18 @@ La lógica de negocio reside prioritariamente en la base de datos SQL Server. Lo
 5.  `sp_CreatePaciente` / `sp_SetPaciente`:
     *   **Propósito**: Alta y actualización de pacientes.
     *   **Detalle**: Vincula al paciente con su obra social id y almacena los campos clínicos avanzados (grupo sanguíneo, alergias y contacto de emergencia).
+6.  `sp_CreateUsuario` / `sp_SetUsuario`:
+    *   **Propósito**: Gestión directa de cuentas de usuario.
+    *   **Detalle**: `sp_CreateUsuario` valida que el `username` y `email` sean únicos antes de insertar, lanzando un error 51000 si hay conflicto. `sp_SetUsuario` permite modificar los atributos de la cuenta (incluido `password_hash` si se proporciona).
+7.  `sp_ChangePassword`:
+    *   **Propósito**: Cambio de contraseña obligatorio o voluntario del usuario logueado.
+    *   **Detalle**: Remueve espacios en blanco (`LTRIM(RTRIM)`) y valida que la nueva contraseña no sea idéntica a la actual (lanzando error 51000 si lo es). Tras el cambio, establece `debe_cambiar_pass = 0`.
+8.  `sp_CreatePasswordResetToken` / `sp_ValidatePasswordResetToken` / `sp_ResetPasswordByToken` *(Migración 010)*:
+    *   **Propósito**: Soporte completo para el flujo de recuperación de contraseña por email.
+    *   **Detalle**: 
+        *   `sp_CreatePasswordResetToken` registra un nuevo token de 1 hora de validez e invalida todos los tokens anteriores del mismo usuario (`usado = 1`).
+        *   `sp_ValidatePasswordResetToken` comprueba que el token provisto esté activo, pertenezca a un usuario activo, no haya expirado y no se haya usado.
+        *   `sp_ResetPasswordByToken` ejecuta el cambio de contraseña real, marca el token como usado, desactiva la obligatoriedad de cambio de contraseña (`debe_cambiar_pass = 0`) e invalida el resto de tokens pendientes para ese usuario.
 
 ---
 

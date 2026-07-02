@@ -1,4 +1,4 @@
-﻿# Documento de Especificación Funcional: MedCloud
+# Documento de Especificación Funcional: MedCloud
 **Rol**: Analista de Sistemas Senior  
 **Destinatarios**: Clientes, Gerencia de Clínicas y Centros de Salud  
 **Fecha de Emisión**: 15 de Junio de 2026  
@@ -197,6 +197,38 @@ Fichero médico privado reservado exclusivamente para el personal de salud para 
 * **Seguridad de Acceso (Excepciones y Privacidad)**:
   * *Exclusión de Roles*: Los usuarios administrativos y de recepción no tienen acceso al módulo de Historia Clínica. Si intentan ingresar a una URL clínica, el sistema los redirige de inmediato bloqueando la consulta.
   * *Permisos Compartidos (Acceso Invitado)*: Por defecto, un médico visualiza las evoluciones generadas en el centro médico. No obstante, a nivel de base de datos se contempla la tabla [Permisos_Historial](file:///c:/Users/nmigl/MedCloud/database/DER.md#L141-L145), la cual permite autorizar a un profesional invitado a visualizar una ficha médica específica para interconsultas rápidas, garantizando confidencialidad.
+
+---
+
+### MÓDULO 7: Gestión de Usuarios, Alta y Seguridad de Contraseñas
+Administra las cuentas de acceso de todos los operadores del sistema, regulando sus permisos por roles y asegurando políticas estrictas de control de contraseñas.
+
+#### A. Flujo de Procesos y Alta de Usuarios
+* **Alta Directiva / Manual (Crear)**:
+  * El administrador crea una cuenta desde el panel de usuarios mediante el formulario correspondiente ([usuarios.controllers.js](file:///c:/Users/nmigl/MedCloud/MedCloud-Backend/src/controllers/usuarios.controllers.js#L30-L49)).
+  * El sistema ejecuta el stored procedure `sp_CreateUsuario` en la base de datos. Este SP realiza una validación crítica: comprueba que ni el `username` ni el `email` estén previamente registrados en la tabla `usuarios`. En caso de duplicidad, interrumpe la transacción y lanza un error personalizado (`THROW 51000`).
+* **Alta Indirecta / Automatizada (Registro de Profesionales)**:
+  * Al registrar un nuevo médico ([profesionales.controllers.js](file:///c:/Users/nmigl/MedCloud/MedCloud-Backend/src/controllers/profesionales.controllers.js#L39-L71)), el sistema genera su cuenta de acceso de manera completamente automática dentro del stored procedure `sp_CreateProfesional` bajo una misma transacción transaccional SQL (`BEGIN TRANSACTION` / `COMMIT TRANSACTION`).
+  * **Nombre de Usuario**: Generado automáticamente concatenando la primera letra del nombre del profesional con su apellido en minúsculas (ej: Juan Pérez -> `jperez`). Si el username ya existe, un bucle `WHILE` en la base de datos incrementa secuencialmente un contador para asegurar unicidad (ej: `jperez1`, `jperez2`).
+  * **Email**: Se genera una dirección temporal ficticia con el patrón `username@MedCloud.local`.
+  * **Contraseña Inicial**: Se asigna temporalmente el número de DNI del profesional.
+  * **Cambio Obligatorio**: Se establece el flag `debe_cambiar_pass = 1` para obligar al profesional a actualizar su contraseña en su primer inicio de sesión.
+* **Modificación y Actualización (Actualizar)**:
+  * El administrador puede modificar los campos del usuario (email, username, rol, estado activo) a través de `sp_SetUsuario` ([usuarios.controllers.js](file:///c:/Users/nmigl/MedCloud/MedCloud-Backend/src/controllers/usuarios.controllers.js#L51-L73)). Si se incluye una nueva contraseña en la solicitud, se actualiza el hash de la misma; de lo contrario, se conserva el valor actual en la base de datos.
+* **Inactivación / Baja (Eliminar / Desactivar)**:
+  * Se promueve la inactivación lógica del usuario estableciendo el campo `activo = 0` para impedir el login sin perder el rastro de auditoría en el sistema (por ejemplo, en el historial clínico o registros de caja). El borrado físico mediante `sp_DeleteUsuario` ([usuarios.controllers.js](file:///c:/Users/nmigl/MedCloud/MedCloud-Backend/src/controllers/usuarios.controllers.js#L75-L88)) está disponible pero restringido por restricciones de clave foránea en la base de datos.
+
+#### B. Gestión de Contraseñas y Seguridad
+* **Políticas de Contraseña en Primer Acceso**:
+  * Cuando un usuario inicia sesión, el endpoint de autenticación ([auth.controllers.js](file:///c:/Users/nmigl/MedCloud/MedCloud-Backend/src/controllers/auth.controllers.js#L8-L63) → `sp_LoginUsuario`) verifica si tiene activo el flag `debe_cambiar_pass = 1`.
+  * En caso afirmativo, el frontend detecta este estado en la respuesta de login y redirige de forma obligatoria al usuario a un panel de cambio de contraseña, impidiendo cualquier otra operación.
+  * Al guardar la nueva contraseña ([usuarios.controllers.js](file:///c:/Users/nmigl/MedCloud/MedCloud-Backend/src/controllers/usuarios.controllers.js#L90-L105) → `sp_ChangePassword`), el sistema remueve espacios en blanco iniciales y finales (`LTRIM(RTRIM)`) y valida que la nueva contraseña limpia no coincida con la actual. Si coinciden, interrumpe el proceso lanzando el error `51000: 'Error: La nueva contraseña no puede ser igual a la anterior.'`. Tras el cambio exitoso, el flag `debe_cambiar_pass` se establece en `0`.
+* **Flujo de Recuperación de Contraseña (Forgot Password)**:
+  * Diseñado bajo lineamientos de seguridad estándar para recuperación por email:
+    1. **Solicitud de Restablecimiento ([passwordReset.controllers.js](file:///c:/Users/nmigl/MedCloud/MedCloud-Backend/src/controllers/passwordReset.controllers.js#L105-L167))**: El usuario proporciona su dirección de correo electrónico. El sistema consulta a través de `sp_GetUsuarioByEmail`. Si el usuario es activo, genera un token criptográfico aleatorio y seguro de 32 bytes (64 caracteres hex) con expiración de 1 hora. Ejecuta `sp_CreatePasswordResetToken` para guardarlo (invalidando automáticamente cualquier token previo de ese usuario para mitigar ataques). Finalmente, despacha un email interactivo con formato HTML mediante Nodemailer.
+    2. **Mitigación de Enumeración**: Para evitar la fuga de información sobre cuentas registradas, el sistema devuelve *siempre* el mismo mensaje genérico al cliente (tanto si el email existe en la base de datos como si no).
+    3. **Validación del Token ([passwordReset.controllers.js](file:///c:/Users/nmigl/MedCloud/MedCloud-Backend/src/controllers/passwordReset.controllers.js#L173-L197))**: Valida que el token exista en la base de datos, pertenezca a un usuario activo, no haya sido usado previamente (`usado = 0`) y que la fecha de expiración sea posterior a la actual mediante `sp_ValidatePasswordResetToken`.
+    4. **Aplicación del Cambio ([passwordReset.controllers.js](file:///c:/Users/nmigl/MedCloud/MedCloud-Backend/src/controllers/passwordReset.controllers.js#L203-L238))**: Realiza el cambio de contraseña ejecutando `sp_ResetPasswordByToken`. El SP valida internamente que el token sea vigente, actualiza la contraseña del usuario en la tabla `usuarios`, pone a `0` el flag `debe_cambiar_pass`, marca el token actual como usado y anula cualquier otro token pendiente de recuperación para ese usuario.
 
 ---
 
