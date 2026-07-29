@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Análisis Funcional – MedCloud</title>
+  <meta name="description" content="Documento de Especificación Funcional de MedCloud: solución integral de software médico y financiero para clínicas y consultorios privados." />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg-app: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+      --bg-card: #ffffff;
+      --border-card: rgba(255,255,255,0.8);
+      --border-separator: #f1f3f8;
+      --text-primary: #1a1a2e;
+      --text-secondary: #4a5568;
+      --text-muted: #9ca3af;
+      --bg-thead: rgba(240,244,255,0.8);
+      --border-thead: rgba(226,232,240,0.6);
+      --shadow-card: 0 10px 40px rgba(0,0,0,0.035);
+      --nav-bg: rgba(255,255,255,0.75);
+      --nav-border: rgba(255,255,255,0.3);
+      --panel-bg-hover: rgba(0,0,0,0.04);
+      --text-main: #1a1a2e;
+      --row-hover: #f8fafc;
+      --sidebar-width: 260px;
+    }
+    .dark-mode {
+      --bg-app: linear-gradient(180deg, #090d16 0%, #0f111a 100%);
+      --bg-card: #151926;
+      --border-card: rgba(255,255,255,0.06);
+      --border-separator: rgba(255,255,255,0.08);
+      --text-primary: #f3f4f6;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --bg-thead: rgba(26,31,46,0.8);
+      --border-thead: rgba(255,255,255,0.08);
+      --shadow-card: 0 10px 40px rgba(0,0,0,0.25);
+      --nav-bg: rgba(21,25,38,0.75);
+      --nav-border: rgba(255,255,255,0.08);
+      --panel-bg-hover: rgba(255,255,255,0.06);
+      --text-main: #f3f4f6;
+      --row-hover: #1b2132;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-app);
+      color: var(--text-primary);
+      min-height: 100vh;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    .app-wrapper { display: flex; min-height: 100vh; position: relative; }
+    .bg-blobs { position: fixed; top:0; left:0; right:0; bottom:0; overflow:hidden; z-index:0; pointer-events:none; }
+    .blob { position:absolute; border-radius:50%; }
+    .blob-1 { top:-10%; left:20%; width:400px; height:400px; background:radial-gradient(circle, rgba(167,139,250,0.08) 0%, rgba(255,255,255,0) 70%); }
+    .blob-2 { bottom:10%; right:10%; width:500px; height:500px; background:radial-gradient(circle, rgba(96,165,250,0.08) 0%, rgba(255,255,255,0) 70%); }
+    .sidebar {
+      position:fixed; top:0; left:0; bottom:0;
+      width:var(--sidebar-width);
+      display:flex; flex-direction:column; gap:8px; padding:0 16px;
+      background:linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%);
+      box-shadow:4px 0 25px rgba(0,0,0,0.15);
+      border-right:1px solid rgba(255,255,255,0.03);
+      color:white; z-index:1000; overflow-y:auto;
+    }
+    .sidebar-header { display:flex; align-items:center; height:72px; padding-top:10px; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:20px; }
+    .sidebar-brand { font-size:1.25rem; font-weight:700; color:#fff; text-decoration:none; }
+    .sidebar-toc { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:2px; }
+    .toc-section-label { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255,255,255,0.3); padding:16px 16px 6px; }
+    .sidebar-toc a { display:flex; align-items:center; gap:10px; height:44px; padding:0 16px; border-radius:12px; color:rgba(255,255,255,0.65); text-decoration:none; font-size:14px; font-weight:500; transition:background 0.25s, color 0.2s, transform 0.25s; }
+    .sidebar-toc a:hover, .sidebar-toc a.active { background:rgba(255,255,255,0.08); color:#fff; transform:translateX(4px); box-shadow:inset 0 0 0 1px rgba(255,255,255,0.05); }
+    .sidebar-toc a ion-icon { font-size:18px; min-width:18px; flex-shrink:0; }
+    .main-content { margin-left:var(--sidebar-width); flex:1; display:flex; flex-direction:column; position:relative; z-index:1; min-height:100vh; }
+    .top-navbar { position:sticky; top:0; background:var(--nav-bg); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid var(--nav-border); box-shadow:0 4px 30px rgba(0,0,0,0.03); z-index:10; padding:0 24px; height:64px; display:flex; align-items:center; justify-content:space-between; transition:background 0.3s ease; }
+    .navbar-brand-title { font-weight:800; font-size:1.1rem; background:linear-gradient(135deg, #1e3a8a, #3b82f6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:-0.5px; }
+    .navbar-actions { display:flex; align-items:center; gap:12px; }
+    .btn-theme { width:40px; height:40px; border-radius:50%; background:var(--panel-bg-hover); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:20px; color:var(--text-main); transition:background 0.3s, color 0.3s; }
+    .btn-back { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:6px 14px; border-radius:10px; border:1.5px solid #dc3545; color:#dc3545; background:transparent; cursor:pointer; text-decoration:none; transition:all 0.2s; }
+    .btn-back:hover { background:#dc3545; color:#fff; }
+    .btn-print { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:6px 14px; border-radius:10px; border:1.5px solid #1a73e8; color:#1a73e8; background:transparent; cursor:pointer; transition:all 0.2s; }
+    .btn-print:hover { background:#1a73e8; color:#fff; }
+    .mobile-menu-btn { display:none; background:none; border:none; cursor:pointer; font-size:26px; color:var(--text-main); }
+    .page-content { flex:1; padding:32px 24px 48px; max-width:900px; margin:0 auto; width:100%; }
+    .doc-hero { background:var(--bg-card); border:1px solid var(--border-card); border-radius:24px; box-shadow:var(--shadow-card); padding:40px 48px; margin-bottom:32px; position:relative; overflow:hidden; animation:fadeInDown 0.5s ease-out; }
+    .doc-hero::before { content:''; position:absolute; top:0; left:0; width:100%; height:5px; background:linear-gradient(90deg, #1a73e8, #7c3aed, #e85d8a); }
+    .doc-hero-meta { display:flex; flex-wrap:wrap; gap:16px; margin-top:20px; }
+    .meta-badge { display:inline-flex; align-items:center; gap:6px; background:var(--bg-thead); border:1px solid var(--border-thead); border-radius:999px; padding:5px 14px; font-size:0.8rem; font-weight:600; color:var(--text-secondary); }
+    .section-card { background:var(--bg-card); border:1px solid var(--border-card); border-radius:20px; box-shadow:var(--shadow-card); margin-bottom:24px; overflow:hidden; animation:fadeIn 0.4s ease-out; }
+    .section-card-header { padding:22px 28px 20px; display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--border-separator); position:relative; }
+    .section-card-header::before { content:''; display:inline-block; width:5px; height:36px; border-radius:4px; flex-shrink:0; }
+    .header-blue::before    { background:linear-gradient(180deg, #1a73e8, #0d47a1); }
+    .header-teal::before    { background:linear-gradient(180deg, #00b09b, #0a8c75); }
+    .header-orange::before  { background:linear-gradient(180deg, #f7941d, #d97706); }
+    .header-rose::before    { background:linear-gradient(180deg, #e85d8a, #c0375f); }
+    .header-purple::before  { background:linear-gradient(180deg, #7c3aed, #4c1d95); }
+    .header-green::before   { background:linear-gradient(180deg, #10b981, #059669); }
+    .header-amber::before   { background:linear-gradient(180deg, #f59e0b, #d97706); }
+    .header-sky::before     { background:linear-gradient(180deg, #0ea5e9, #0284c7); }
+    .section-icon { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; color:#fff; }
+    .icon-blue   { background:linear-gradient(135deg, #1a73e8, #0d47a1); }
+    .icon-teal   { background:linear-gradient(135deg, #00b09b, #0a8c75); }
+    .icon-orange { background:linear-gradient(135deg, #f7941d, #d97706); }
+    .icon-rose   { background:linear-gradient(135deg, #e85d8a, #c0375f); }
+    .icon-purple { background:linear-gradient(135deg, #7c3aed, #4c1d95); }
+    .icon-green  { background:linear-gradient(135deg, #10b981, #059669); }
+    .icon-amber  { background:linear-gradient(135deg, #f59e0b, #d97706); }
+    .icon-sky    { background:linear-gradient(135deg, #0ea5e9, #0284c7); }
+    .section-title { font-size:1.15rem; font-weight:800; color:var(--text-primary); margin:0; line-height:1.25; }
+    .section-subtitle { font-size:0.83rem; color:var(--text-secondary); margin:2px 0 0; }
+    .section-body { padding:28px; color:var(--text-secondary); line-height:1.7; font-size:0.94rem; }
+    .section-body h3 { font-size:1.02rem; font-weight:700; color:var(--text-primary); margin-top:24px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+    .section-body h3:first-child { margin-top:0; }
+    .section-body p { margin-bottom:12px; }
+    .section-body p:last-child { margin-bottom:0; }
+    .section-body ul, .section-body ol { padding-left:20px; margin-bottom:12px; }
+    .section-body li { margin-bottom:6px; }
+    .section-body strong { color:var(--text-primary); font-weight:700; }
+    .info-steps { display:flex; flex-direction:column; gap:14px; }
+    .info-step { display:flex; gap:14px; align-items:flex-start; padding:14px 16px; background:var(--row-hover); border-radius:12px; border:1px solid var(--border-separator); transition:background 0.2s; }
+    .info-step:hover { background:var(--bg-thead); }
+    .step-number { width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg, #1a73e8, #7c3aed); color:#fff; font-size:0.78rem; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+    .step-content { flex:1; font-size:0.9rem; color:var(--text-secondary); line-height:1.6; }
+    .pillars-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:8px; }
+    .pillar-card { padding:18px 20px; background:var(--row-hover); border:1px solid var(--border-separator); border-radius:14px; display:flex; gap:12px; align-items:flex-start; transition:background 0.2s, transform 0.2s; }
+    .pillar-card:hover { background:var(--bg-thead); transform:translateY(-2px); }
+    .pillar-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; color:#fff; }
+    .pillar-card h5 { font-size:0.88rem; font-weight:700; color:var(--text-primary); margin:0 0 4px; }
+    .pillar-card p { font-size:0.82rem; color:var(--text-secondary); margin:0; line-height:1.5; }
+    .crud-grid { display:flex; flex-direction:column; border:1px solid var(--border-separator); border-radius:14px; overflow:hidden; }
+    .crud-row { display:grid; grid-template-columns:160px 1fr; border-bottom:1px solid var(--border-separator); align-items:stretch; }
+    .crud-row:last-child { border-bottom:none; }
+    .crud-label { padding:14px 16px; background:var(--bg-thead); border-right:1px solid var(--border-thead); font-size:0.79rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-primary); display:flex; align-items:center; gap:7px; word-break:keep-all; white-space:normal; min-width:0; }
+    .crud-content { padding:14px 16px; font-size:0.88rem; color:var(--text-secondary); line-height:1.65; display:flex; flex-direction:column; justify-content:center; }
+    .crud-content ul { margin:0; padding-left:18px; }
+    .crud-content li { margin-bottom:5px; }
+    .rules-list { display:flex; flex-direction:column; gap:10px; }
+    .rule-item { display:flex; gap:10px; align-items:flex-start; font-size:0.9rem; color:var(--text-secondary); }
+    .rule-icon { width:24px; height:24px; border-radius:6px; background:rgba(239,68,68,0.1); color:#ef4444; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; margin-top:1px; }
+    .alert-info-box { padding:14px 18px; background:rgba(26,115,232,0.07); border:1px solid rgba(26,115,232,0.2); border-left:4px solid #1a73e8; border-radius:10px; font-size:0.88rem; color:var(--text-secondary); margin:12px 0; }
+    .alert-warning-box { padding:14px 18px; background:rgba(245,158,11,0.07); border:1px solid rgba(245,158,11,0.2); border-left:4px solid #f59e0b; border-radius:10px; font-size:0.88rem; color:var(--text-secondary); margin:12px 0; }
+    .chip { display:inline-flex; align-items:center; gap:4px; font-size:0.75rem; font-weight:600; padding:3px 10px; border-radius:999px; vertical-align:middle; }
+    .chip-blue   { background:rgba(26,115,232,0.12); color:#1a73e8; }
+    .chip-green  { background:rgba(16,185,129,0.12); color:#059669; }
+    .chip-orange { background:rgba(247,148,29,0.12); color:#d97706; }
+    .chip-red    { background:rgba(239,68,68,0.12); color:#ef4444; }
+    .chip-purple { background:rgba(124,58,237,0.12); color:#7c3aed; }
+    .mermaid-wrapper { background:var(--row-hover); border:1px solid var(--border-separator); border-radius:14px; padding:24px; overflow-x:auto; margin-top:8px; }
+    .mermaid svg { max-width:100%; }
+    .doc-footer { background:linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%); border-top:1px solid rgba(255,255,255,0.05); color:white; padding:24px; text-align:center; }
+    .doc-footer p { margin:0; font-size:0.82rem; color:rgba(255,255,255,0.5); }
+    @keyframes fadeInDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    @media print {
+      .sidebar, .top-navbar, .btn-theme, .btn-back, .btn-print, .mobile-menu-btn { display:none !important; }
+      .main-content { margin-left:0 !important; }
+      .page-content { max-width:100%; padding:0; }
+      .section-card, .doc-hero { box-shadow:none !important; border:1px solid #ddd !important; }
+    }
+    @media (max-width: 992px) { .pillars-grid { grid-template-columns:1fr; } }
+    @media (max-width: 768px) {
+      .sidebar { transform:translateX(-100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+      .sidebar.mobile-open { transform:translateX(0); box-shadow:8px 0 30px rgba(0,0,0,0.4); }
+      .main-content { margin-left:0; }
+      .mobile-menu-btn { display:flex !important; }
+      .doc-hero { padding:28px 24px; }
+      .page-content { padding:20px 16px 40px; }
+      .crud-row { grid-template-columns:1fr; }
+      .crud-label { border-right:none; border-bottom:1px solid var(--border-separator); align-items:flex-start; }
+    }
+    .overlay-mobile { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:999; }
+    .overlay-mobile.active { display:block; }
+  </style>
+</head>
+<body>
+<div class="app-wrapper">
+  <div class="bg-blobs"><div class="blob blob-1"></div><div class="blob blob-2"></div></div>
+  <div class="overlay-mobile" id="mobileOverlay" onclick="closeSidebar()"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header"><span class="sidebar-brand">🏥 MedCloud</span></div>
+    <p class="toc-section-label">Índice del Documento</p>
+    <ul class="sidebar-toc">
+      <li><a href="#introduccion"><ion-icon name="information-circle-outline"></ion-icon> Introducción</a></li>
+      <li><a href="#valor-comercial"><ion-icon name="star-outline"></ion-icon> Valor Comercial</a></li>
+      <li><a href="#trial"><ion-icon name="time-outline"></ion-icon> Licencia y Trial</a></li>
+      <li><a href="#scheduler"><ion-icon name="notifications-outline"></ion-icon> Recordatorios</a></li>
+      <li><a href="#modulo-pacientes"><ion-icon name="people-outline"></ion-icon> M1: Pacientes</a></li>
+      <li><a href="#modulo-profesionales"><ion-icon name="medkit-outline"></ion-icon> M2: Profesionales</a></li>
+      <li><a href="#modulo-turnos"><ion-icon name="calendar-outline"></ion-icon> M3: Turnos</a></li>
+      <li><a href="#modulo-caja"><ion-icon name="wallet-outline"></ion-icon> M4: Caja Diaria</a></li>
+      <li><a href="#modulo-liquidaciones"><ion-icon name="cash-outline"></ion-icon> M5: Liquidaciones</a></li>
+      <li><a href="#modulo-historial"><ion-icon name="document-text-outline"></ion-icon> M6: Historia Clínica</a></li>
+      <li><a href="#modulo-usuarios"><ion-icon name="shield-checkmark-outline"></ion-icon> M7: Usuarios</a></li>
+      <li><a href="#flujos"><ion-icon name="git-branch-outline"></ion-icon> Flujos y Diagrama</a></li>
+    </ul>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+    <nav class="top-navbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mobile-menu-btn" onclick="openSidebar()"><ion-icon name="menu-outline"></ion-icon></button>
+        <span class="navbar-brand-title">Análisis Funcional — MedCloud</span>
+      </div>
+      <div class="navbar-actions">
+        <button class="btn-theme" id="themeBtn" title="Cambiar tema" onclick="toggleTheme()">
+          <ion-icon name="moon-outline" id="themeIcon"></ion-icon>
+        </button>
+        <button class="btn-print" onclick="window.print()">
+          <ion-icon name="print-outline"></ion-icon> Imprimir
+        </button>
+        <a href="/" class="btn-back">
+          <ion-icon name="log-out-outline"></ion-icon> Volver al Sistema
+        </a>
+      </div>
+    </nav>
+
+    <main class="page-content">
+
+      <!-- HERO -->
+      <div class="doc-hero" id="introduccion">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">
+          <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#1a73e8,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;">
+            <ion-icon name="document-text-outline"></ion-icon>
+          </div>
+          <div>
+            <h1 style="font-size:1.7rem;font-weight:800;color:var(--text-primary);margin:0;letter-spacing:-0.5px;">Documento de Especificación Funcional</h1>
+            <p style="margin:4px 0 0;font-size:0.92rem;color:var(--text-secondary);">Sistema MedCloud — Gestión Médica Integral</p>
+          </div>
+        </div>
+        <div class="doc-hero-meta">
+          <span class="meta-badge"><ion-icon name="person-circle-outline"></ion-icon> Analista de Sistemas Senior</span>
+          <span class="meta-badge"><ion-icon name="people-outline"></ion-icon> Clientes y Gerencia de Clínicas</span>
+          <span class="meta-badge"><ion-icon name="calendar-outline"></ion-icon> 15 de Junio de 2026</span>
+        </div>
+        <div style="margin-top:24px;color:var(--text-secondary);font-size:0.95rem;line-height:1.7;">
+          <p><strong>MedCloud</strong> es una solución integral de software médico y financiero de vanguardia, diseñada para optimizar los flujos operativos en clínicas y consultorios privados. El sistema está estructurado bajo un enfoque multiusuario con segregación de funciones, garantizando un control estricto sobre la agenda de citas, la confidencialidad de las historias clínicas de los pacientes, el flujo de dinero en efectivo en el centro de salud y la distribución automática de honorarios médicos.</p>
+          <p style="margin-bottom:0;">Este documento detalla el comportamiento funcional del sistema de una manera accesible para perfiles directivos y clientes interesados en contratar el servicio, explicando los procesos clave, los flujos de información, las reglas de negocio y las excepciones de control.</p>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 2: VALOR COMERCIAL -->
+      <div class="section-card" id="valor-comercial">
+        <div class="section-card-header header-blue">
+          <div class="section-icon icon-blue"><ion-icon name="star-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">2. Razones Clave para Contratar MedCloud</h2>
+            <p class="section-subtitle">Cinco pilares de valor comercial que justifican y aceleran la adopción</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <p>Para una administración médica y financiera sin fisuras, MedCloud ofrece cinco pilares indispensables:</p>
+          <div class="pillars-grid">
+            <div class="pillar-card">
+              <div class="pillar-icon icon-green"><ion-icon name="cash-outline"></ion-icon></div>
+              <div>
+                <h5>Control de Caja en Tiempo Real</h5>
+                <p>Evita discrepancias mediante un proceso rígido de apertura y cierre de caja. El sistema calcula dinámicamente el dinero esperado y obliga al personal a rendir cuentas ante cualquier desvío físico.</p>
+              </div>
+            </div>
+            <div class="pillar-card">
+              <div class="pillar-icon icon-teal"><ion-icon name="calculator-outline"></ion-icon></div>
+              <div>
+                <h5>Distribución Automática de Honorarios</h5>
+                <p>Automatiza el cobro médico basándose en acuerdos porcentuales de retención por profesional. Al momento del pago, el sistema congela la tasa acordada, garantizando liquidaciones transparentes.</p>
+              </div>
+            </div>
+            <div class="pillar-card">
+              <div class="pillar-icon icon-blue"><ion-icon name="notifications-outline"></ion-icon></div>
+              <div>
+                <h5>Recordatorios Automatizados</h5>
+                <p>Reduce el absentismo de pacientes mediante notificaciones automáticas previas a la cita y mantiene informados a los profesionales enviándoles su agenda del día siguiente.</p>
+              </div>
+            </div>
+            <div class="pillar-card">
+              <div class="pillar-icon icon-rose"><ion-icon name="medical-outline"></ion-icon></div>
+              <div>
+                <h5>Ficha Médica con Alertas Críticas</h5>
+                <p>Permite visualizar alergias y condiciones críticas resaltadas en <strong style="color:#ef4444;">rojo</strong> en la ficha del paciente para prevenir negligencias médicas graves.</p>
+              </div>
+            </div>
+            <div class="pillar-card" style="grid-column:1/-1;">
+              <div class="pillar-icon icon-purple"><ion-icon name="lock-closed-outline"></ion-icon></div>
+              <div>
+                <h5>Estricta Seguridad y Confidencialidad</h5>
+                <p>Estructura de accesos blindada mediante roles de usuario. El personal administrativo gestiona la agenda y la cobranza sin tener acceso a los diagnósticos o evolución clínica del paciente, mientras que los médicos disponen de un entorno privado de diagnóstico y prescripción.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 3: TRIAL -->
+      <div class="section-card" id="trial">
+        <div class="section-card-header header-orange">
+          <div class="section-icon icon-orange"><ion-icon name="time-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">3. Modelo de Licencia y Periodo de Prueba (Trial)</h2>
+            <p class="section-subtitle">Ciclo de vida de la licencia, mecanismo de bloqueo y proceso de activación</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <p>MedCloud ofrece una modalidad de demostración funcional inicial (<strong>Trial de 15 días</strong>) para que los centros médicos evalúen el producto de forma directa y práctica.</p>
+          <h3><ion-icon name="play-circle-outline" style="color:#f7941d;"></ion-icon> 3.1. Funcionamiento del Trial</h3>
+          <ul>
+            <li>Al dar de alta el entorno por primera vez, el sistema se inicializa en <strong>modo Trial</strong> (configurado en la tabla <code>configuracion_trial</code> con <code>es_trial = 1</code>).</li>
+            <li>Cada vez que un usuario inicia sesión, el sistema calcula la diferencia entre la fecha de inicio del Trial más la cantidad de días permitidos (15 días) respecto al día actual, obteniendo la propiedad computada <code>trial_dias_restantes</code>.</li>
+          </ul>
+          <h3><ion-icon name="lock-closed-outline" style="color:#ef4444;"></ion-icon> 3.2. Mecanismo de Bloqueo por Expiración</h3>
+          <p>Para proteger los datos de alteraciones sin licencia pero permitiendo que el cliente consulte su información histórica, el sistema implementa un bloqueo de seguridad en dos niveles:</p>
+          <div class="info-steps">
+            <div class="info-step">
+              <div class="step-number">1</div>
+              <div class="step-content"><strong>Bloqueo en el Servidor (Backend):</strong> El componente de seguridad intercepta todas las solicitudes del sistema. Si los días restantes son inferiores a <code>0</code> (vencido), bloquea de inmediato cualquier acción de escritura (crear, editar o eliminar) enviando el error <span class="chip chip-red">403 TRIAL_EXPIRED</span>, permitiendo únicamente consultas de lectura.</div>
+            </div>
+            <div class="info-step">
+              <div class="step-number">2</div>
+              <div class="step-content"><strong>Bloqueo de Interfaz de Usuario (Frontend):</strong> Si el trial ha expirado, el sistema oculta los controles normales y despliega un panel de bloqueo absoluto. Este panel impide al operador navegar por las pestañas normales y ofrece un botón de contacto directo para la activación.</div>
+            </div>
+          </div>
+          <h3><ion-icon name="checkmark-circle-outline" style="color:#10b981;"></ion-icon> 3.3. Proceso de Alta y Activación de la Licencia</h3>
+          <div class="info-steps">
+            <div class="info-step"><div class="step-number">1</div><div class="step-content">El cliente hace clic en el botón <strong>"Activar Licencia"</strong> que figura en los banners de aviso del sistema o en la pantalla de bloqueo.</div></div>
+            <div class="info-step"><div class="step-number">2</div><div class="step-content">Esto abre de forma directa un chat de soporte por WhatsApp con un mensaje preconfigurado (ej: <em>"Hola! Terminó mi periodo de prueba de MedCloud y quiero activar mi licencia"</em>).</div></div>
+            <div class="info-step"><div class="step-number">3</div><div class="step-content">Una vez verificado el pago de la licencia, el equipo de soporte técnico ejecuta una actualización rápida en la base de datos (actualizando <code>es_trial = 0</code> en la tabla <code>configuracion_trial</code>).</div></div>
+            <div class="info-step"><div class="step-number">4</div><div class="step-content"><strong>Resultado:</strong> El sistema se activa de inmediato para todos los usuarios del centro médico de forma transparente, eliminando los avisos del trial y desbloqueando permanentemente las funciones de registro de información.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 4: SCHEDULER -->
+      <div class="section-card" id="scheduler">
+        <div class="section-card-header header-teal">
+          <div class="section-icon icon-teal"><ion-icon name="alarm-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">4. Programador de Recordatorios y Agendas Automáticas</h2>
+            <p class="section-subtitle">Módulo de automatización que ejecuta tareas en segundo plano cada 10 minutos</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <h3><ion-icon name="mail-outline" style="color:#00b09b;"></ion-icon> 4.1. Recordatorio de Turnos a Pacientes</h3>
+          <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+            <span class="chip chip-green"><ion-icon name="person-outline"></ion-icon> Destinatario: Pacientes</span>
+            <span class="chip chip-blue"><ion-icon name="refresh-outline"></ion-icon> Ciclo: Cada 10 minutos</span>
+          </div>
+          <p><strong>Objetivo:</strong> Asegurar que los pacientes asistan a sus turnos del día siguiente.</p>
+          <div class="info-steps">
+            <div class="info-step"><div class="step-number">1</div><div class="step-content">El sistema consulta la base de datos buscando todos los turnos del día de <strong>mañana</strong> en estado <em>Pendiente</em> o <em>Confirmado</em> con <code>recordatorio_dia_anterior_enviado = 0</code>.</div></div>
+            <div class="info-step"><div class="step-number">2</div><div class="step-content">Para cada turno encontrado, extrae la dirección de email registrada del paciente.</div></div>
+            <div class="info-step"><div class="step-number">3</div><div class="step-content">Despacha un correo electrónico personalizado con: Nombre del Paciente, Fecha y Hora del Turno, Nombre del Médico y Especialidad.</div></div>
+            <div class="info-step"><div class="step-number">4</div><div class="step-content">Una vez enviado con éxito, actualiza el estado del turno asignándole <code>recordatorio_dia_anterior_enviado = 1</code> para prevenir el envío duplicado.</div></div>
+            <div class="info-step"><div class="step-number">5</div><div class="step-content"><em>Caso especial:</em> Si el paciente no posee un correo electrónico válido, el sistema lo marca automáticamente como procesado para evitar bucles repetitivos.</div></div>
+          </div>
+          <hr style="border-color:var(--border-separator);margin:20px 0;" />
+          <h3><ion-icon name="briefcase-outline" style="color:#00b09b;"></ion-icon> 4.2. Aviso a Médicos de su Agenda de Mañana</h3>
+          <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+            <span class="chip chip-purple"><ion-icon name="medkit-outline"></ion-icon> Destinatario: Médicos</span>
+            <span class="chip chip-orange"><ion-icon name="time-outline"></ion-icon> Ejecución: 20:00 hs diarias</span>
+          </div>
+          <p><strong>Objetivo:</strong> Notificar a cada profesional cuántos pacientes atenderá mañana y enviarle su grilla de turnos.</p>
+          <div class="info-steps">
+            <div class="info-step"><div class="step-number">1</div><div class="step-content">El programador evalúa la hora del servidor. Si es la ventana horaria de las <strong>20:00 hs</strong>, inicia el proceso de aviso.</div></div>
+            <div class="info-step"><div class="step-number">2</div><div class="step-content">Consulta qué médicos tienen turnos programados para el día siguiente y verifica que no se les haya enviado ya la agenda de esa fecha (consultando la tabla de control <code>envios_agenda_medica</code>).</div></div>
+            <div class="info-step"><div class="step-number">3</div><div class="step-content">Para cada médico calificado, recopila de forma ordenada todas sus citas del día de mañana (Paciente, Horario exacto de Inicio y Fin, Estado y Motivo de la Consulta).</div></div>
+            <div class="info-step"><div class="step-number">4</div><div class="step-content">Genera una plantilla de correo electrónico HTML dinámica con el recuento total de pacientes programados y una tabla detallada con los horarios.</div></div>
+            <div class="info-step"><div class="step-number">5</div><div class="step-content">Envía la agenda por correo al email del profesional.</div></div>
+            <div class="info-step"><div class="step-number">6</div><div class="step-content">Registra un renglón en la tabla <code>envios_agenda_medica</code> para ese médico y esa fecha. Esto asegura que el aviso se envíe <strong>exactamente una vez</strong> durante la franja de las 20:00 hs.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MÓDULO 1: PACIENTES -->
+      <div class="section-card" id="modulo-pacientes">
+        <div class="section-card-header header-blue">
+          <div class="section-icon icon-blue"><ion-icon name="people-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">Módulo 1: Gestión de Pacientes</h2>
+            <p class="section-subtitle">Centraliza la base de datos demográfica e información clínica general</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <h3>A. Flujo de Procesos (CRUD)</h3>
+          <div class="crud-grid">
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-green">C</span> Crear</div>
+              <div class="crud-content">
+                <ul>
+                  <li>El administrativo completa el formulario de Paciente.</li>
+                  <li>El sistema normaliza automáticamente el teléfono celular agregando el prefijo internacional argentino (<code>549</code>).</li>
+                  <li>Se vincula al paciente con una Obra Social y se introduce su Número de Afiliado.</li>
+                  <li>Se registran campos de alerta médica como <strong>Alergias</strong>, Dirección y Teléfono de Emergencia.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-blue">R</span> Leer</div>
+              <div class="crud-content">
+                <ul>
+                  <li>Filtrar y buscar pacientes por <strong>DNI</strong> o por <strong>Nombre / Apellido</strong>.</li>
+                  <li>Al ingresar a la ficha, si existen datos en el campo "Alergias", la pantalla muestra un recuadro de aviso destacado en color <strong style="color:#ef4444;">rojo</strong>.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-orange">U</span> Actualizar</div>
+              <div class="crud-content">Permite corregir datos demográficos, cambios de obra social, nuevos contactos de emergencia o actualizar la lista de alergias.</div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-red">D</span> Eliminar</div>
+              <div class="crud-content">
+                <div class="alert-warning-box"><strong>⚠️ Excepción Crítica:</strong> Un paciente no puede ser borrado físicamente si posee turnos agendados o registros en su historia clínica. En lugar de un borrado permanente, el sistema restringe o inactiva los registros manteniendo la coherencia histórica.</div>
+              </div>
+            </div>
+          </div>
+          <h3 style="margin-top:24px;">B. Reglas de Negocio</h3>
+          <div class="rules-list">
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>DNI Único:</strong> No se permite registrar a dos pacientes con el mismo número de DNI.</div></div>
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>Validación de Email:</strong> El campo de correo electrónico debe seguir un patrón formal (<code>nombre@dominio.com</code>) para evitar errores en el Scheduler de recordatorios.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MÓDULO 2: PROFESIONALES -->
+      <div class="section-card" id="modulo-profesionales">
+        <div class="section-card-header header-teal">
+          <div class="section-icon icon-teal"><ion-icon name="medkit-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">Módulo 2: Gestión de Profesionales y Horarios</h2>
+            <p class="section-subtitle">Administra el equipo de salud, sus comisiones y grilla de atención semanal</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <h3>A. Flujo de Procesos (CRUD)</h3>
+          <div class="crud-grid">
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-green">C</span> Crear</div>
+              <div class="crud-content">
+                <ul>
+                  <li>Se ingresa la especialidad, número de matrícula y el <strong>porcentaje de retención</strong> para la clínica.</li>
+                  <li>El sistema requiere ingresar los horarios semanales mediante una grilla interactiva (ej: Lunes de 09:00 a 14:00).</li>
+                  <li><em>Automatización:</em> Al confirmar el alta del médico, el sistema crea automáticamente una cuenta de usuario con perfil <span class="chip chip-purple">MEDICO</span>, estableciendo una contraseña temporal (su número de documento) y activando la bandera de <strong>cambio de contraseña obligatorio</strong>.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-blue">R</span> Leer</div>
+              <div class="crud-content">Listado de médicos activos y visualización de sus turnos disponibles en el calendario.</div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-orange">U</span> Actualizar</div>
+              <div class="crud-content">Permite actualizar datos demográficos, modificar el porcentaje de retención para nuevas consultas y rediseñar su grilla de horarios semanales.</div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-red">D</span> Eliminar</div>
+              <div class="crud-content">Un médico no se elimina físicamente si posee registros históricos de turnos o liquidaciones, manteniéndose su registro para auditoría histórica de pagos.</div>
+            </div>
+          </div>
+          <h3 style="margin-top:24px;">B. Reglas de Negocio</h3>
+          <div class="rules-list">
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>Horarios Consistentes:</strong> No se pueden guardar horarios con hora de inicio mayor o igual a la hora de fin.</div></div>
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>Matrícula y CUIT únicos:</strong> Previene duplicidades de profesionales en el centro de salud.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MÓDULO 3: TURNOS -->
+      <div class="section-card" id="modulo-turnos">
+        <div class="section-card-header header-purple">
+          <div class="section-icon icon-purple"><ion-icon name="calendar-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">Módulo 3: Agenda y Reservas de Turnos</h2>
+            <p class="section-subtitle">Coordinación física de citas médicas cruzando disponibilidad del médico con requerimientos del paciente</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <h3>A. Flujo de Procesos (CRUD)</h3>
+          <div class="crud-grid">
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-green">C</span> Crear</div>
+              <div class="crud-content">
+                <ul>
+                  <li>Se selecciona el médico, la fecha y se eligen horarios del catálogo de rangos libres de su agenda semanal.</li>
+                  <li>El sistema inicializa la cita en estado <span class="chip chip-orange">Pendiente</span> o <span class="chip chip-blue">Confirmado</span>.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-blue">R</span> Leer</div>
+              <div class="crud-content">Panel visual de turnos tipo calendario. Permite filtros por médico para ver las horas ocupadas y libres.</div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-orange">U</span> Actualizar</div>
+              <div class="crud-content">
+                Los turnos transicionan de estado durante el día:<br>
+                <code>Pendiente</code> → <code>Confirmado</code> → <span class="chip chip-green" style="margin:0 2px;">Completado</span> o <span class="chip chip-red" style="margin:0 2px;">Cancelado</span>
+              </div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-red">D</span> Cancelar</div>
+              <div class="crud-content">El administrativo cancela el turno, liberando inmediatamente el espacio en la grilla horaria para que pueda ser reservado por otro paciente.</div>
+            </div>
+          </div>
+          <h3 style="margin-top:24px;">B. Reglas de Negocio</h3>
+          <div class="rules-list">
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>Prevención de Superposiciones:</strong> El sistema impide agendar dos turnos al mismo tiempo para el mismo médico.</div></div>
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>Fuera de Rango:</strong> No se pueden agendar turnos fuera de los días y horarios declarados de atención del profesional.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MÓDULO 4: CAJA -->
+      <div class="section-card" id="modulo-caja">
+        <div class="section-card-header header-green">
+          <div class="section-icon icon-green"><ion-icon name="wallet-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">Módulo 4: Control de Caja Diaria</h2>
+            <p class="section-subtitle">Módulo contable esencial para auditoría física de ingresos diarios en secretaría</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <h3>A. Flujo de Procesos</h3>
+          <div class="crud-grid">
+            <div class="crud-row">
+              <div class="crud-label">Apertura</div>
+              <div class="crud-content">Al inicio del día laboral, el administrativo debe abrir la caja indicando el <strong>saldo físico de apertura</strong> (dinero disponible para dar vueltos, ej: $5.000). El estado de la caja pasa a <span class="chip chip-green">Abierta</span>.</div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label">Cobros</div>
+              <div class="crud-content">Cada vez que un paciente asiste a un turno, el administrativo registra el pago seleccionando el método de cobro (Efectivo, Transferencia, Tarjeta). El sistema suma automáticamente el monto a <code>monto_cierre_esperado</code>.</div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label">Cierre</div>
+              <div class="crud-content">
+                <ul>
+                  <li>Al finalizar el día, el operador realiza un conteo físico e ingresa el total en <code>monto_cierre_real</code>.</li>
+                  <li>El sistema computa automáticamente la <strong>Diferencia de Caja</strong> (<code>Cierre Real − Cierre Esperado</code>).</li>
+                  <li>Guarda las firmas de auditoría (Usuario de Apertura, Usuario de Cierre y sus respectivas fechas y horas exactas).</li>
+                  <li>Cambia el estado de la caja a <span class="chip chip-red">Cerrada</span>.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <h3 style="margin-top:24px;">B. Reglas de Negocio</h3>
+          <div class="rules-list">
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>Flujo Bloqueado:</strong> El sistema prohíbe registrar cobros o pagos de turnos si no existe una caja del día abierta.</div></div>
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>Caja Única por Día:</strong> No se puede tener más de una caja abierta al mismo tiempo para la fecha en curso.</div></div>
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>Caja Cerrada Inmutable:</strong> Una vez que una caja diaria se declara como Cerrada, no admite mutaciones o inserción de nuevos pagos.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MÓDULO 5: LIQUIDACIONES -->
+      <div class="section-card" id="modulo-liquidaciones">
+        <div class="section-card-header header-amber">
+          <div class="section-icon icon-amber"><ion-icon name="cash-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">Módulo 5: Liquidación de Honorarios Médicos</h2>
+            <p class="section-subtitle">Cierres financieros para retribuir a los profesionales de la salud</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <h3>A. Flujo de Procesos</h3>
+          <div class="crud-grid">
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-green">C</span> Procesar</div>
+              <div class="crud-content">
+                <ul>
+                  <li>El administrador selecciona un rango de fechas y un médico en particular.</li>
+                  <li>El sistema extrae todos los turnos completados y cobrados en ese periodo.</li>
+                  <li>Aplica los porcentajes de retención congelados en cada pago (guardados en la tabla <code>pagos</code> en el campo <code>porcentaje_retencion</code>).</li>
+                  <li>Computa el <strong>monto bruto</strong>, la <strong>retención de la clínica</strong> y el <strong>neto que le corresponde cobrar al médico</strong>.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-blue">R</span> Reportes</div>
+              <div class="crud-content">Muestra una planilla resumen interactiva con el detalle de las sumas a liquidar, facilitando la generación del pago físico o transferencia.</div>
+            </div>
+          </div>
+          <h3 style="margin-top:24px;">B. Regla Clave</h3>
+          <div class="alert-info-box">
+            <strong>🔒 Congelamiento de Condiciones:</strong> La retención copiada del perfil del profesional se guarda físicamente en la fila del pago. Si la clínica decide modificar la comisión de un médico de 20% a 25% el día de hoy, los turnos cobrados la semana pasada a tasa de 20% mantendrán sus comisiones intactas, evitando recálculos financieros retroactivos incorrectos.
+          </div>
+        </div>
+      </div>
+
+      <!-- MÓDULO 6: HISTORIA CLÍNICA -->
+      <div class="section-card" id="modulo-historial">
+        <div class="section-card-header header-rose">
+          <div class="section-icon icon-rose"><ion-icon name="document-text-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">Módulo 6: Historia Clínica Digital</h2>
+            <p class="section-subtitle">Fichero médico privado reservado exclusivamente para el personal de salud</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <h3>A. Flujo de Procesos (CRUD)</h3>
+          <div class="crud-grid">
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-green">C</span> Crear</div>
+              <div class="crud-content">
+                <ul>
+                  <li>El médico abre la ficha clínica del paciente durante la consulta e ingresa: Motivo de consulta, Evolución (síntomas, examen físico, notas), Diagnóstico oficial y Tratamiento prescrito.</li>
+                  <li>Puede adjuntar archivos médicos (estudios en PDF, imágenes radiológicas) a la ficha del paciente.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-blue">R</span> Leer</div>
+              <div class="crud-content">El médico puede visualizar la línea de tiempo de todas las evoluciones previas redactadas por él u otros profesionales de la clínica.</div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label"><span class="chip chip-orange">U</span> Actualizar</div>
+              <div class="crud-content">Permite editar o agregar notas complementarias en caso de correcciones clínicas inmediatas.</div>
+            </div>
+          </div>
+          <h3 style="margin-top:24px;">B. Seguridad de Acceso y Privacidad</h3>
+          <div class="rules-list">
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>Exclusión de Roles:</strong> Los usuarios administrativos y de recepción no tienen acceso al módulo de Historia Clínica. Si intentan ingresar a una URL clínica, el sistema los redirige de inmediato bloqueando la consulta.</div></div>
+            <div class="rule-item"><div class="rule-icon"><ion-icon name="alert-circle-outline"></ion-icon></div><div><strong>Permisos Compartidos (Acceso Invitado):</strong> A nivel de base de datos, la tabla <code>Permisos_Historial</code> permite autorizar a un profesional invitado a visualizar una ficha médica específica para interconsultas rápidas, garantizando confidencialidad.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MÓDULO 7: USUARIOS -->
+      <div class="section-card" id="modulo-usuarios">
+        <div class="section-card-header header-sky">
+          <div class="section-icon icon-sky"><ion-icon name="shield-checkmark-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">Módulo 7: Gestión de Usuarios y Seguridad</h2>
+            <p class="section-subtitle">Administra cuentas de acceso, roles y políticas estrictas de control de contraseñas</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <h3>A. Flujo de Procesos y Alta de Usuarios</h3>
+          <div class="crud-grid">
+            <div class="crud-row">
+              <div class="crud-label">Alta Manual</div>
+              <div class="crud-content">
+                <ul>
+                  <li>El administrador crea una cuenta desde el panel de usuarios mediante el formulario correspondiente.</li>
+                  <li>El sistema ejecuta el stored procedure <code>sp_CreateUsuario</code> que comprueba que ni el <code>username</code> ni el <code>email</code> estén previamente registrados. En caso de duplicidad, interrumpe la transacción y lanza un error personalizado (<code>THROW 51000</code>).</li>
+                </ul>
+              </div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label">Alta Automática</div>
+              <div class="crud-content">
+                <p>Al registrar un nuevo médico, el sistema genera su cuenta de acceso de manera completamente automática bajo una misma transacción SQL:</p>
+                <ul>
+                  <li><strong>Nombre de Usuario:</strong> Primera letra del nombre + apellido en minúsculas (ej: Juan Pérez → <code>jperez</code>). Si existe, un bucle <code>WHILE</code> incrementa un contador (<code>jperez1</code>, <code>jperez2</code>…).</li>
+                  <li><strong>Email:</strong> Dirección temporal ficticia con el patrón <code>username@MedCloud.local</code>.</li>
+                  <li><strong>Contraseña Inicial:</strong> Número de DNI del profesional.</li>
+                  <li><strong>Cambio Obligatorio:</strong> Se activa el flag <code>debe_cambiar_pass = 1</code>.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="crud-row">
+              <div class="crud-label">Inactivación</div>
+              <div class="crud-content">Se promueve la inactivación lógica del usuario estableciendo el campo <code>activo = 0</code> para impedir el login sin perder el rastro de auditoría en el sistema. El borrado físico está disponible pero restringido por restricciones de clave foránea en la base de datos.</div>
+            </div>
+          </div>
+          <h3 style="margin-top:24px;">B. Gestión de Contraseñas y Seguridad</h3>
+          <div class="info-steps">
+            <div class="info-step">
+              <div class="step-number"><ion-icon name="key-outline" style="font-size:12px;"></ion-icon></div>
+              <div class="step-content">
+                <strong>Políticas de Contraseña en Primer Acceso:</strong> Cuando un usuario inicia sesión y tiene el flag <code>debe_cambiar_pass = 1</code>, el frontend redirige de forma obligatoria a un panel de cambio de contraseña, impidiendo cualquier otra operación. Al guardar la nueva contraseña, el sistema valida que no coincida con la actual mediante <code>LTRIM/RTRIM</code>. Si coinciden, interrumpe el proceso lanzando el error <code>51000: 'La nueva contraseña no puede ser igual a la anterior.'</code>.
+              </div>
+            </div>
+            <div class="info-step">
+              <div class="step-number"><ion-icon name="refresh-outline" style="font-size:12px;"></ion-icon></div>
+              <div class="step-content">
+                <strong>Flujo de Recuperación de Contraseña (Forgot Password):</strong>
+                <ol style="margin-top:8px;padding-left:16px;">
+                  <li><strong>Solicitud:</strong> El usuario proporciona su email. El sistema genera un token criptográfico aleatorio de 32 bytes (64 caracteres hex) con expiración de 1 hora y despacha un email HTML mediante Nodemailer.</li>
+                  <li><strong>Mitigación de Enumeración:</strong> El sistema devuelve <em>siempre</em> el mismo mensaje genérico al cliente, tanto si el email existe como si no, para evitar la fuga de información sobre cuentas registradas.</li>
+                  <li><strong>Validación del Token:</strong> Valida que el token exista, pertenezca a un usuario activo, no haya sido usado (<code>usado = 0</code>) y que la fecha de expiración sea posterior a la actual.</li>
+                  <li><strong>Aplicación del Cambio:</strong> Actualiza la contraseña, pone a <code>0</code> el flag <code>debe_cambiar_pass</code>, marca el token como usado y anula cualquier otro token pendiente para ese usuario.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 6: FLUJOS Y DIAGRAMA -->
+      <div class="section-card" id="flujos">
+        <div class="section-card-header header-purple">
+          <div class="section-icon icon-purple"><ion-icon name="git-branch-outline"></ion-icon></div>
+          <div>
+            <h2 class="section-title">6. Resumen de Flujos y Relación de Entidades</h2>
+            <p class="section-subtitle">Diagrama de secuencia que resume cómo interactúan los actores y procesos clave de MedCloud</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <p>La siguiente representación resume visualmente cómo interactúan los actores y procesos clave de MedCloud:</p>
+          <div class="mermaid-wrapper">
+            <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Administrativo
+    actor Paciente
+    actor Medico
+    participant Sistema as MedCloud
+    participant DB as Base de Datos
+
+    Note over Administrativo, Sistema: 1. Flujo de Caja y Turnos
+    Administrativo->>Sistema: Abre Caja Diaria con saldo inicial
+    Sistema->>DB: Registra Caja Abierta
+    Paciente->>Administrativo: Solicita Cita Medica
+    Administrativo->>Sistema: Registra Turno (Valida disponibilidad del Medico)
+    Sistema->>DB: Guarda Turno en estado Pendiente/Confirmado
+
+    Note over Sistema, Paciente: 2. Flujo de Recordatorios (Scheduler)
+    loop Cada 10 minutos (en segundo plano)
+        Sistema->>DB: Consulta turnos de manana sin notificar
+        DB-->>Sistema: Devuelve lista de turnos y mails de pacientes
+        Sistema->>Paciente: Envia Email con Recordatorio detallado
+        Sistema->>DB: Marca recordatorio_enviado = 1
+    end
+
+    Note over Medico, Sistema: 3. Flujo de Agenda Diaria (Scheduler)
+    loop A las 20:00 hs de cada dia
+        Sistema->>DB: Consulta total de turnos de manana por Medico
+        DB-->>Sistema: Devuelve listado ordenado
+        Sistema->>Medico: Envia Email con resumen de agenda y conteo de pacientes
+        Sistema->>DB: Registra envio en envios_agenda_medica
+    end
+
+    Note over Administrativo, Medico: 4. Consulta y Cobro
+    Paciente->>Administrativo: Asiste a la cita
+    Administrativo->>Sistema: Registra cobro de consulta
+    Sistema->>DB: Inserta fila en Pagos (congela retencion pactada con el medico)
+    Sistema->>DB: Actualiza Caja Diaria e historial de pagos
+    Medico->>Sistema: Ingresa a Ficha del Paciente (Valida rol MEDICO)
+    Sistema->>Medico: Muestra Alergias en Rojo (Alerta visual)
+    Medico->>Sistema: Carga Evolucion Clinica, Diagnostico y Receta
+    Sistema->>DB: Guarda historial_clinico y adjunta estudios medicos
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PIE DE DOCUMENTO -->
+      <div style="text-align:center;margin-top:32px;padding:24px;color:var(--text-muted);font-size:0.82rem;">
+        <p><em>Este documento ha sido confeccionado con fines de análisis funcional y soporte comercial para la adquisición de la plataforma <strong style="color:var(--text-secondary);">MedCloud</strong>.</em></p>
+      </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="doc-footer">
+      <strong>MedCloud</strong> &nbsp;·&nbsp;
+      <p style="display:inline;color:rgba(255,255,255,0.5);font-size:0.82rem;">Sistema de Gestión Médica &nbsp;·&nbsp; Documento de Análisis Funcional &nbsp;·&nbsp; © 2026</p>
+    </footer>
+  </div>
+</div>
+
+<script>
+  const html = document.documentElement;
+  const themeIcon = document.getElementById('themeIcon');
+  let isDark = localStorage.getItem('theme') === 'dark'
+    || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  function applyTheme() {
+    if (isDark) {
+      html.classList.add('dark-mode');
+      document.body.classList.add('dark-mode');
+      if (themeIcon) themeIcon.setAttribute('name', 'sunny-outline');
+    } else {
+      html.classList.remove('dark-mode');
+      document.body.classList.remove('dark-mode');
+      if (themeIcon) themeIcon.setAttribute('name', 'moon-outline');
+    }
+  }
+
+  function toggleTheme() {
+    isDark = !isDark;
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    applyTheme();
+  }
+
+  applyTheme();
+
+  mermaid.initialize({ startOnLoad: true, theme: isDark ? 'dark' : 'default', securityLevel: 'loose' });
+
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('mobileOverlay');
+  function openSidebar() { sidebar.classList.add('mobile-open'); overlay.classList.add('active'); }
+  function closeSidebar() { sidebar.classList.remove('mobile-open'); overlay.classList.remove('active'); }
+
+  document.querySelectorAll('.sidebar-toc a').forEach(link => {
+    link.addEventListener('click', () => { if (window.innerWidth <= 768) closeSidebar(); });
+  });
+
+  const sections = document.querySelectorAll('[id]');
+  const tocLinks = document.querySelectorAll('.sidebar-toc a');
+  function onScroll() {
+    let current = '';
+    sections.forEach(s => { if (s.getBoundingClientRect().top <= 100) current = s.getAttribute('id'); });
+    tocLinks.forEach(link => {
+      link.classList.remove('active');
+      if (link.getAttribute('href') === '#' + current) link.classList.add('active');
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body>
+</html>

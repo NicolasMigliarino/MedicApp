@@ -29,7 +29,7 @@ const Footer = () => {
                     {/* COLUMNA 2: Links y Contacto */}
                     <div className="col-md-6 mb-3 mb-md-0 text-md-end">
                         <div className="d-flex justify-content-md-end gap-3 mb-2 small">
-                            <a href="https://app.notion.com/p/Gu-a-de-Gesti-n-por-M-dulos-MedCloud-389272abae7680008acfc698702c6dac?source=copy_link" target="_blank" rel="noopener noreferrer" className="text-light text-decoration-none">Documentación</a>
+                            <a href="/analisis-funcional.html" target="_blank" rel="noopener noreferrer" className="text-light text-decoration-none">Documentación</a>
                             <Link to="/soporte" className="text-light text-decoration-none">Soporte</Link>
                             <a href="https://nicolasmigliarino.github.io/Portfolio/" target="_blank" rel="noopener noreferrer" className="text-light text-decoration-none">Contacto</a>
                             <Link to="/privacidad" className="text-light text-decoration-none">Política de Privacidad</Link>
