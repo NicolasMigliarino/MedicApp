@@ -1,4 +1,7 @@
 const { getConnection, sql } = require('../db');
+const { generarReciboEfectivo } = require('../utils/reciboHelper');
+const path = require('path');
+const fs = require('fs');
 const getTurnos = async (req, res) => {
     try {
         // Extraemos los datos del usuario logueado desde el token (req.user)
@@ -146,16 +149,191 @@ const registrarPagoTurno = async (req, res) => {
         }
 
         const pool = await getConnection();
+
+        let comprobante_url = null;
+        if (req.file) {
+            comprobante_url = '/uploads/' + req.file.filename;
+        } else if (metodo_pago === 'Efectivo') {
+            // Obtener datos para la plantilla del recibo
+            const infoResult = await pool.request()
+                .input('turno_id', sql.Int, id)
+                .query(`
+                    SELECT 
+                        t.fecha_hora_inicio,
+                        pac.nombre AS paciente_nombre, pac.apellido AS paciente_apellido, pac.dni AS paciente_dni,
+                        prof.nombre AS profesional_nombre, prof.apellido AS profesional_apellido
+                    FROM dbo.turnos t
+                    INNER JOIN dbo.pacientes pac ON t.paciente_id = pac.id
+                    INNER JOIN dbo.profesionales prof ON t.profesional_id = prof.id
+                    WHERE t.id = @turno_id
+                `);
+
+            if (infoResult.recordset.length > 0) {
+                const tInfo = infoResult.recordset[0];
+                const pacienteFullName = `${tInfo.paciente_nombre} ${tInfo.paciente_apellido}`;
+                const profesionalFullName = `Dr. ${tInfo.profesional_nombre} ${tInfo.profesional_apellido}`;
+                const fechaConsulta = new Date(tInfo.fecha_hora_inicio).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+                
+                const tempId = 'CASH_' + Date.now();
+                comprobante_url = generarReciboEfectivo(pacienteFullName, tInfo.paciente_dni, profesionalFullName, fechaConsulta, parseFloat(monto), tempId);
+            }
+        }
+
         await pool.request()
             .input('turno_id', sql.Int, id)
             .input('monto', sql.Decimal(10, 2), monto)
             .input('metodo_pago', sql.VarChar(50), metodo_pago)
             .input('usuario_registro_id', sql.Int, req.user ? req.user.id : 1)
+            .input('comprobante_url', sql.NVarChar(255), comprobante_url)
             .execute('sp_RegistrarPagoTurno');
 
-        res.json({ message: 'Pago registrado exitosamente. El turno ha sido Confirmado de forma automática.' });
+        res.json({ 
+            message: 'Pago registrado exitosamente. El turno ha sido Confirmado de forma automática.',
+            comprobante_url 
+        });
     } catch (error) {
         console.error("Error al registrar pago:", error.message);
+        res.status(500).send(error.message);
+    }
+};
+
+const registrarPagoMultiplesTurnos = async (req, res) => {
+    try {
+        const { turno_ids, monto, metodo_pago } = req.body;
+        let ids = [];
+        if (typeof turno_ids === 'string') {
+            ids = JSON.parse(turno_ids);
+        } else {
+            ids = turno_ids;
+        }
+
+        if (!ids || ids.length === 0 || !monto || !metodo_pago) {
+            return res.status(400).json({ message: 'Los IDs de turnos, el monto y el método de pago son obligatorios.' });
+        }
+
+        const pool = await getConnection();
+        const montoIndividual = parseFloat(monto) / ids.length;
+        
+        let comprobante_url = null;
+        if (req.file) {
+            comprobante_url = '/uploads/' + req.file.filename;
+        } else if (metodo_pago === 'Efectivo') {
+            const infoResult = await pool.request()
+                .query(`
+                    SELECT 
+                        t.id AS turno_id, t.fecha_hora_inicio,
+                        pac.nombre AS paciente_nombre, pac.apellido AS paciente_apellido, pac.dni AS paciente_dni,
+                        prof.nombre AS profesional_nombre, prof.apellido AS profesional_apellido
+                    FROM dbo.turnos t
+                    INNER JOIN dbo.pacientes pac ON t.paciente_id = pac.id
+                    INNER JOIN dbo.profesionales prof ON t.profesional_id = prof.id
+                    WHERE t.id IN (${ids.map(id => parseInt(id)).join(',')})
+                `);
+
+            if (infoResult.recordset.length > 0) {
+                const tInfo = infoResult.recordset[0];
+                const pacienteFullName = `${tInfo.paciente_nombre} ${tInfo.paciente_apellido}`;
+                const tDni = tInfo.paciente_dni;
+                
+                const detailsText = infoResult.recordset.map(row => {
+                    const dateStr = new Date(row.fecha_hora_inicio).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+                    return `Turno #${row.turno_id} - Dr. ${row.profesional_nombre} ${row.profesional_apellido} (${dateStr})`;
+                }).join('<br>');
+
+                const tempId = 'CASH_MULTI_' + Date.now();
+                const filename = `recibo_efectivo_${tempId}_${Date.now()}.html`;
+                const filepath = path.join(__dirname, '../../uploads', filename);
+
+                const fechaPago = new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+
+                const htmlContent = `
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Recibo de Pago - MedCloud</title>
+                    <style>
+                        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 20px; }
+                        .receipt-box { max-width: 600px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); font-size: 16px; line-height: 24px; color: #555; }
+                        .title { font-size: 24px; font-weight: bold; color: #0f766e; text-align: center; margin-bottom: 20px; }
+                        .header-table, .details-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                        .header-table td { padding: 5px 0; }
+                        .details-table th, .details-table td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+                        .details-table th { background-color: #f2f2f2; font-weight: bold; }
+                        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+                        .total { font-size: 18px; font-weight: bold; color: #333; text-align: right; margin-top: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="receipt-box">
+                        <div class="title">🏥 MedCloud - Recibo de Pago (Adelanto)</div>
+                        
+                        <table class="header-table">
+                            <tr>
+                                <td><strong>Número de Recibo:</strong> #${tempId}</td>
+                                <td style="text-align: right;"><strong>Fecha de Emisión:</strong> ${fechaPago}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Paciente:</strong> ${pacienteFullName} (DNI: ${tDni})</td>
+                                <td style="text-align: right;"><strong>Método de Pago:</strong> Efectivo</td>
+                            </tr>
+                        </table>
+
+                        <table class="details-table">
+                            <thead>
+                                <tr>
+                                    <th>Descripción / Turnos Adelantados</th>
+                                    <th>Total por Turno</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>${detailsText}</td>
+                                    <td>$${montoIndividual.toFixed(2)} c/u</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="total">Total Cancelado: $${parseFloat(monto).toFixed(2)}</div>
+
+                        <div class="footer">
+                            MedCloud © 2026 - Sistema de Gestión Médica<br>
+                            Este documento es un comprobante de pago oficial emitido por caja para múltiples consultas.
+                        </div>
+                    </div>
+                </body>
+                </html>
+                `;
+
+                const uploadsDir = path.join(__dirname, '../../uploads');
+                if (!fs.existsSync(uploadsDir)) {
+                    fs.mkdirSync(uploadsDir, { recursive: true });
+                }
+
+                fs.writeFileSync(filepath, htmlContent, 'utf8');
+                comprobante_url = `/uploads/${filename}`;
+            }
+        }
+
+        const usuario_registro_id = req.user ? req.user.id : 1;
+        
+        for (const tId of ids) {
+            await pool.request()
+                .input('turno_id', sql.Int, parseInt(tId))
+                .input('monto', sql.Decimal(10, 2), montoIndividual)
+                .input('metodo_pago', sql.VarChar(50), metodo_pago)
+                .input('usuario_registro_id', sql.Int, usuario_registro_id)
+                .input('comprobante_url', sql.NVarChar(255), comprobante_url)
+                .execute('sp_RegistrarPagoTurno');
+        }
+
+        res.json({ 
+            message: 'Todos los pagos adelantados fueron registrados con éxito.',
+            comprobante_url 
+        });
+
+    } catch (error) {
+        console.error("🚨 ERROR AL REGISTRAR PAGOS MÚLTIPLES:", error.message);
         res.status(500).send(error.message);
     }
 };
@@ -179,5 +357,6 @@ module.exports = {
     deleteTurno, 
     getHorarios, 
     registrarPagoTurno,
+    registrarPagoMultiplesTurnos,
     enviarRecordatorioManual
 };

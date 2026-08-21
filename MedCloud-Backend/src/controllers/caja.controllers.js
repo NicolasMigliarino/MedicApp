@@ -79,9 +79,21 @@ const cerrarCaja = async (req, res) => {
             .input('monto_cierre_real', sql.Decimal(10, 2), monto_cierre_real)
             .execute('sp_CerrarCaja');
 
+        const balance = result.recordset[0];
+        if (balance) {
+            const dif = parseFloat(balance.diferencia || 0);
+            if (dif === 0) {
+                balance.diagnostico = '✔️ Caja Cuadrada Perfectamente';
+            } else if (dif > 0) {
+                balance.diagnostico = '🚨 Sobrante en Caja';
+            } else {
+                balance.diagnostico = '🚨 Faltante en Caja';
+            }
+        }
+
         res.json({
             message: 'Caja cerrada exitosamente',
-            balance: result.recordset[0]
+            balance: balance
         });
     } catch (error) {
         console.error("Error al cerrar caja:", error.message);

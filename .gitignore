@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Backend uploads (keep directory, ignore uploaded files)
+MedCloud-Backend/uploads/*
+!MedCloud-Backend/uploads/.gitkeep
+
+# Playwright Test Outputs
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+
+# OS / Editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.tmp

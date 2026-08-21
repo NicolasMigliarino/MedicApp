@@ -15,8 +15,8 @@ const Footer = () => {
                 <div className="row align-items-center">
 
                     {/* COLUMNA 1: Logo y Copyright */}
-                    <div className="col-md-6 mb-3 mb-md-0">
-                        <h4 className="fw-bold d-flex align-items-center gap-2">
+                    <div className="col-md-6 mb-3 mb-md-0 text-center text-md-start">
+                        <h4 className="fw-bold d-flex align-items-center justify-content-center justify-content-md-start gap-2">
                             {/* Un pequeño cuadradito simulando tu logo */}
                             <span className="bg-primary rounded p-1 d-inline-block" style={{ width: '24px', height: '24px' }}></span>
                             {clinicConfig.nombre}
@@ -27,8 +27,8 @@ const Footer = () => {
                     </div>
 
                     {/* COLUMNA 2: Links y Contacto */}
-                    <div className="col-md-6 mb-3 mb-md-0 text-md-end">
-                        <div className="d-flex justify-content-md-end gap-3 mb-2 small">
+                    <div className="col-md-6 mb-3 mb-md-0 text-center text-md-end">
+                        <div className="d-flex flex-wrap justify-content-center justify-content-md-end gap-3 mb-2 small">
                             <a href="/analisis-funcional.html" target="_blank" rel="noopener noreferrer" className="text-light text-decoration-none">Documentación</a>
                             <Link to="/soporte" className="text-light text-decoration-none">Soporte</Link>
                             <a href="https://nicolasmigliarino.github.io/Portfolio/" target="_blank" rel="noopener noreferrer" className="text-light text-decoration-none">Contacto</a>

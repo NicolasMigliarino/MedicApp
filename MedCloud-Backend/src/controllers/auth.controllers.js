@@ -1,9 +1,11 @@
 const { getConnection, sql } = require('../db');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 /**
  * Endpoint de Login de Usuario.
- * Autentica credenciales y genera un token JWT que inyecta los días restantes del trial de demostración.
+ * Autentica credenciales, genera un identificador único de sesión (session_id)
+ * e inyecta el token JWT para control de sesión única y trial.
  */
 const login = async (req, res) => {
     const { username, password } = req.body;
@@ -23,20 +25,27 @@ const login = async (req, res) => {
 
         const usuario = result.recordset[0];
 
-        // 2. Verificar contraseña en texto plano (según el estado de desarrollo actual)
+        // 2. Verificar contraseña en texto plano
         if (usuario.password_hash !== password) {
             return res.status(400).json({ message: 'Usuario o contraseña incorrectos' });
         }
 
-        // 3. Generación del JWT Token
-        // Se inyecta la propiedad 'trial_dias_restantes' (calculada por sp_LoginUsuario) 
-        // para que pueda ser validada de forma ágil y centralizada en el middleware verificarToken.
+        // 3. Generar token único de sesión (para invalidar cualquier sesión previa en otro dispositivo)
+        const session_id = crypto.randomUUID();
+
+        await pool.request()
+            .input('usuario_id', sql.Int, usuario.id)
+            .input('session_token', sql.NVarChar(500), session_id)
+            .execute('sp_ActualizarSesionUsuario');
+
+        // 4. Generación del JWT Token incluyendo session_id
         const token = jwt.sign(
             { 
                 id: usuario.id, 
                 username: usuario.username, 
                 rol: usuario.rol_codigo,
-                trial_dias_restantes: usuario.trial_dias_restantes 
+                trial_dias_restantes: usuario.trial_dias_restantes,
+                session_id
             },
             'PALABRA_SECRETA_SUPER_SEGURA',
             { expiresIn: '8h' }

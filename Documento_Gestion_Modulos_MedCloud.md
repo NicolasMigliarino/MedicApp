@@ -69,6 +69,16 @@ MedCloud incluye un periodo de demostración de **15 días**:
 | Trial vencido | Se bloquean las acciones de **crear, editar y eliminar**. Solo se permite **consultar** información existente. |
 | Activación de licencia | El cliente contacta a soporte; una vez activada, el bloqueo se elimina para todos los usuarios. |
 
+### 3.4. Seguridad de sesiones y control de acceso simultáneo
+
+Para maximizar la protección de los datos y evitar el uso indebido de licencias compartidas, MedCloud aplica dos mecanismos de seguridad automáticos:
+
+1. **Cierre automático por inactividad (15 minutos)**:
+   - Si la computadora queda encendida sin uso por 15 minutos (sin movimiento de mouse o teclado), la sesión se destruye automáticamente y redirige al usuario a la pantalla de login con un aviso de advertencia.
+2. **Control de sesión única activa (Anti-Doble Login)**:
+   - No se permite que dos personas o dispositivos utilicen el mismo usuario al mismo tiempo.
+   - Si una persona ingresa con las credenciales de un usuario que ya estaba activo en otra computadora, la **sesión anterior se cierra automáticamente de inmediato** informando al operador: *"Se cerró tu sesión porque la cuenta ingresó desde otro navegador o dispositivo."*
+
 ---
 
 ## 4. Panel principal (Dashboard)
@@ -132,6 +142,18 @@ Centraliza los datos demográficos y de contacto de cada persona atendida en el 
 - El DNI debe ser único en todo el sistema.
 - El email debe tener formato válido (`nombre@dominio.com`) para que funcionen los recordatorios automáticos.
 - Los médicos **no pueden** crear, editar ni eliminar pacientes; solo visualizar el listado y acceder a la historia clínica.
+
+### 5.5. Control de Asistencia y Alerta por Ausentismo
+
+MedCloud rastrea automáticamente el comportamiento de asistencia del paciente para prevenir ausentismos y optimizar la agenda médica:
+
+- **Insignia visual `⚠️ Alto Ausentismo`**: Si un paciente acumula **2 o más inasistencias previo a la fecha**, el sistema resalta automáticamente una insignia de advertencia en color rojo en la lista general de pacientes.
+- **Botón `📅 Asistencia`**: Al hacer clic, abre un panel telemétrico con tarjetas KPI:
+  - **Total de Turnos**: Conteo histórico de citas agendadas.
+  - **Tasa de Asistencia (%)**: Porcentaje real de turnos cumplidos.
+  - **Conteo por Estado**: Atendidos, Ausentes, Cancelados y Pendientes.
+  - **Línea de tiempo cronológica**: Desglose de cada turno con médico, especialidad, estado y comprobante cobrado.
+- **Botón `💳 Pagos`**: Abre un modal con la lista histórica de comprobantes de pago asociados al paciente (fecha, profesional, importe y medio de cobro).
 
 ---
 

@@ -157,10 +157,40 @@ const deletePaciente = async (req, res) => {
 
         if (result.rowsAffected[0] === 0) return res.status(404).json({ message: 'Paciente no encontrado' });
         
-        return res.sendStatus(204);
     } catch (error) {
         res.status(500).send(error.message);
     }
 };
 
-module.exports = { getPacientes, getPaciente, createPaciente, setPaciente, deletePaciente, getObrasSociales };
+/**
+ * Obtener el resumen de métricas e historial de asistencia de un paciente.
+ */
+const getHistorialAsistenciaPaciente = async (req, res) => {
+    try {
+        const pool = await getConnection();
+        const result = await pool.request()
+            .input('paciente_id', sql.Int, req.params.id)
+            .execute('sp_GetHistorialAsistenciaPaciente');
+
+        const resumen = result.recordsets[0] ? result.recordsets[0][0] : {
+            total_turnos: 0,
+            total_asistidos: 0,
+            total_ausentes: 0,
+            total_cancelados: 0,
+            total_pendientes: 0,
+            tasa_asistencia: 0.00
+        };
+
+        const historial = result.recordsets[1] || [];
+
+        res.json({
+            resumen,
+            historial
+        });
+    } catch (error) {
+        console.error("Error al obtener historial de asistencia:", error.message);
+        res.status(500).send(error.message);
+    }
+};
+
+module.exports = { getPacientes, getPaciente, createPaciente, setPaciente, deletePaciente, getObrasSociales, getHistorialAsistenciaPaciente };

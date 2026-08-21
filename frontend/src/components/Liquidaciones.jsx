@@ -15,6 +15,7 @@ const Liquidaciones = () => {
     const [consolidado, setConsolidado] = useState(null);
     const [hasQueried, setHasQueried] = useState(false);
     const [showGuide, setShowGuide] = useState(true);
+    const [payoutsHistory, setPayoutsHistory] = useState([]);
 
     const token = localStorage.getItem('token');
     const config = {
@@ -79,13 +80,107 @@ const Liquidaciones = () => {
         window.print();
     };
 
-    const handleLiquidar = () => {
-        Swal.fire({
-            icon: 'success',
-            title: '¡Honorarios Liquidados!',
-            text: 'Se ha registrado la liquidación del profesional y se disparó el comprobante correspondiente.',
-            confirmButtonColor: '#3b82f6'
+    const fetchPayoutsHistory = async (profesionalId) => {
+        try {
+            const res = await axios.get(`http://localhost:3000/pagos/profesional/${profesionalId}`, config);
+            setPayoutsHistory(res.data);
+        } catch (error) {
+            console.error('Error fetching payouts history:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedProfesional) {
+            fetchPayoutsHistory(selectedProfesional);
+        } else {
+            setPayoutsHistory([]);
+        }
+    }, [selectedProfesional]);
+
+    const handleLiquidar = async () => {
+        if (!selectedProfesional || !consolidado) return;
+
+        const montoPropuesto = consolidado.total_honorarios_medico || 0;
+
+        const { value: formValues } = await Swal.fire({
+            title: '💳 Registrar Pago de Liquidación',
+            html: `
+                <div style="padding: 5px 10px; overflow: hidden; text-align: left;">
+                    <p style="font-size: 0.9rem; color: #6b7280; margin-bottom: 15px;">
+                        Completá los datos para registrar el pago real transferido al médico.
+                    </p>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">Monto Neto a Pagar ($)</label>
+                    <input id="swal-input-monto" type="number" class="form-control" value="${montoPropuesto}" style="margin-bottom: 20px;">
+                    
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">Fecha Desde (Período)</label>
+                    <input id="swal-input-desde" type="date" class="form-control" value="${fechaDesde}" style="margin-bottom: 20px;">
+                    
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">Fecha Hasta (Período)</label>
+                    <input id="swal-input-hasta" type="date" class="form-control" value="${fechaHasta}" style="margin-bottom: 20px;">
+
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">Adjuntar Comprobante de Transferencia</label>
+                    <input id="swal-input-comprobante" type="file" class="form-control" style="margin-bottom: 20px;">
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: '✅ Registrar Pago',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#10b981',
+            preConfirm: () => {
+                const monto = document.getElementById('swal-input-monto').value;
+                const desde = document.getElementById('swal-input-desde').value;
+                const hasta = document.getElementById('swal-input-hasta').value;
+                const fileInput = document.getElementById('swal-input-comprobante');
+                const file = fileInput ? fileInput.files[0] : null;
+
+                if (!monto || parseFloat(monto) <= 0) {
+                    Swal.showValidationMessage('Por favor, ingresá un monto válido.');
+                    return false;
+                }
+                if (!desde || !hasta) {
+                    Swal.showValidationMessage('Por favor, ingresá el rango de fechas del período liquidado.');
+                    return false;
+                }
+                return { monto: parseFloat(monto), fecha_desde: desde, fecha_hasta: hasta, comprobante: file };
+            }
         });
+
+        if (formValues) {
+            try {
+                const formData = new FormData();
+                formData.append('monto', formValues.monto);
+                formData.append('fecha_desde', formValues.fecha_desde);
+                formData.append('fecha_hasta', formValues.fecha_hasta);
+                if (formValues.comprobante) {
+                    formData.append('comprobante', formValues.comprobante);
+                }
+
+                await axios.post(`http://localhost:3000/pagos/profesional/${selectedProfesional}`, formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Pago Registrado!',
+                    text: 'Se ha asentado el pago de la liquidación en el historial del profesional.',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+
+                fetchPayoutsHistory(selectedProfesional);
+            } catch (error) {
+                console.error(error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: error.response?.data?.message || 'No se pudo registrar el pago de la liquidación.'
+                });
+            }
+        }
     };
 
     return (
@@ -409,6 +504,164 @@ const Liquidaciones = () => {
                     <p className="text-muted">Seleccione un profesional médico y un rango de fechas para liquidar honorarios.</p>
                 </div>
             )}
+
+            {/* HISTORIAL DE PAGOS A PROFESIONALES (Solo d-print-none) */}
+            {selectedProfesional && (
+                <div className="mod-table-card p-4 mt-4 d-print-none">
+                    <h3 style={{ color: 'var(--text-primary)', fontWeight: '600', fontSize: '1.15rem', marginBottom: '20px' }}>
+                        💳 Historial de Liquidaciones Pagadas a este Profesional
+                    </h3>
+                    {payoutsHistory.length === 0 ? (
+                        <p className="text-muted text-center py-4">No se registran pagos de liquidaciones anteriores para este médico.</p>
+                    ) : (
+                        <div className="table-responsive">
+                            <table className="table align-middle table-hover" style={{ fontSize: '0.9rem' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ color: 'var(--text-secondary)' }}>Fecha de Pago</th>
+                                        <th style={{ color: 'var(--text-secondary)' }}>Monto Pagado</th>
+                                        <th style={{ color: 'var(--text-secondary)' }}>Período Liquidado</th>
+                                        <th style={{ color: 'var(--text-secondary)' }}>Registrado Por</th>
+                                        <th style={{ color: 'var(--text-secondary)' }} className="text-center">Comprobante</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {payoutsHistory.map((p) => (
+                                        <tr key={p.pago_id}>
+                                            <td style={{ color: 'var(--text-primary)' }}>
+                                                {new Date(p.fecha_pago).toLocaleString('es-AR')}
+                                            </td>
+                                            <td style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
+                                                ${parseFloat(p.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td style={{ color: 'var(--text-secondary)' }}>
+                                                {new Date(p.fecha_desde).toLocaleDateString('es-AR')} al {new Date(p.fecha_hasta).toLocaleDateString('es-AR')}
+                                            </td>
+                                            <td style={{ color: 'var(--text-secondary)' }}>
+                                                {p.usuario_registro_nombre}
+                                            </td>
+                                            <td className="text-center">
+                                                {p.comprobante_url ? (
+                                                    <a 
+                                                        href={`http://localhost:3000${p.comprobante_url}`} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="btn btn-sm btn-outline-primary"
+                                                        style={{ padding: '2px 8px', fontSize: '0.8rem', borderRadius: '4px' }}
+                                                    >
+                                                        📄 Ver Recibo
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-muted">-</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+            {/* TICKET DE IMPRESIÓN EXCLUSIVO PARA IMPRESORA */}
+            <div className="ticket-print-only">
+                <div className="ticket-box">
+                    <div className="ticket-header">
+                        <h2 className="ticket-title">🏥 MedCloud</h2>
+                        <div className="ticket-subtitle">COMPROBANTE DE LIQUIDACIÓN DE HONORARIOS</div>
+                        <div className="ticket-divider">------------------------------------------------</div>
+                    </div>
+
+                    <div className="ticket-body">
+                        <div className="ticket-row">
+                            <span><strong>Profesional:</strong></span>
+                            <span>Dr. {consolidado?.profesional_nombre}</span>
+                        </div>
+                        <div className="ticket-row">
+                            <span><strong>Especialidad:</strong></span>
+                            <span>{consolidado?.especialidad || 'General'}</span>
+                        </div>
+                        <div className="ticket-row">
+                            <span><strong>Período:</strong></span>
+                            <span>{fechaDesde ? new Date(fechaDesde).toLocaleDateString('es-AR') : ''} al {fechaHasta ? new Date(fechaHasta).toLocaleDateString('es-AR') : ''}</span>
+                        </div>
+                        <div className="ticket-row">
+                            <span><strong>Fecha Emisión:</strong></span>
+                            <span>{new Date().toLocaleDateString('es-AR')} {new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+
+                        <div className="ticket-divider">------------------------------------------------</div>
+
+                        <div className="ticket-section-title">RESUMEN DE HONORARIOS</div>
+                        <div className="ticket-row">
+                            <span>Consultas Atendidas:</span>
+                            <strong>{consolidado?.cantidad_consultas || 0}</strong>
+                        </div>
+                        <div className="ticket-row">
+                            <span>Bruto Total Recaudado:</span>
+                            <strong>${parseFloat(consolidado?.total_recaudado_bruto || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</strong>
+                        </div>
+                        <div className="ticket-row">
+                            <span>% Retención Acordado:</span>
+                            <strong>{detalles.length > 0 ? parseFloat(detalles[0].porcentaje_retencion).toFixed(0) : 20}%</strong>
+                        </div>
+                        <div className="ticket-row">
+                            <span>Retención Centro Médico:</span>
+                            <span style={{ color: '#dc2626' }}>-${parseFloat(consolidado?.total_comision_clinica || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <div className="ticket-divider">================================================</div>
+
+                        <div className="ticket-row ticket-total">
+                            <span>NETO A LIQUIDAR:</span>
+                            <span>${parseFloat(consolidado?.total_honorarios_medico || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+
+                        <div className="ticket-divider">================================================</div>
+
+                        {detalles.length > 0 && (
+                            <div style={{ marginTop: '10px' }}>
+                                <div className="ticket-section-title">DESGLOSE DE CONSULTAS</div>
+                                <table className="ticket-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Paciente</th>
+                                            <th>Método</th>
+                                            <th style={{ textAlign: 'right' }}>Neto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {detalles.map(d => (
+                                            <tr key={d.pago_id}>
+                                                <td>{new Date(d.fecha_pago).toLocaleDateString('es-AR')}</td>
+                                                <td>{d.paciente_nombre}</td>
+                                                <td>{d.metodo_pago}</td>
+                                                <td style={{ textAlign: 'right' }}>${parseFloat(d.honorarios_medico).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        <div className="ticket-signatures">
+                            <div className="signature-col">
+                                <div className="signature-line"></div>
+                                <div>Firma Administración</div>
+                            </div>
+                            <div className="signature-col">
+                                <div className="signature-line"></div>
+                                <div>Conformidad Médico</div>
+                            </div>
+                        </div>
+
+                        <div className="ticket-footer">
+                            MedCloud © 2026 - Sistema de Gestión Médica
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

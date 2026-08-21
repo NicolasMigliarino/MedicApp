@@ -2,8 +2,9 @@ import { test, expect } from '@playwright/test';
 
 test.describe('MedCloud - Flujos Administrativos E2E', () => {
 
-  // Limpiar el almacenamiento después de cada test para aislar sesiones
-  test.afterEach(async ({ page }) => {
+  // Limpiar el almacenamiento antes de cada test para aislar sesiones
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login');
     await page.evaluate(() => localStorage.clear());
   });
 

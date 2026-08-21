@@ -15,14 +15,10 @@ const useResizableColumns = () => {
         const table = tableRef.current;
         if (!table) return;
 
-        const headers = Array.from(table.querySelectorAll('thead th'));
+        // Skip resizing and locking widths on mobile/touch screens (viewport <= 1024px)
+        if (window.innerWidth <= 1024) return;
 
-        // Set initial widths so resize is stable
-        headers.forEach(th => {
-            if (!th.style.width) {
-                th.style.width = `${th.offsetWidth}px`;
-            }
-        });
+        const headers = Array.from(table.querySelectorAll('thead th'));
 
         const handles = [];
 
@@ -42,6 +38,14 @@ const useResizableColumns = () => {
 
             const onMouseDown = (e) => {
                 e.preventDefault();
+
+                // Set widths on all headers at the moment drag starts, so resize is stable
+                headers.forEach(header => {
+                    if (!header.style.width) {
+                        header.style.width = `${header.offsetWidth}px`;
+                    }
+                });
+
                 startX = e.clientX;
                 startWidth = th.offsetWidth;
                 handle.classList.add('dragging');

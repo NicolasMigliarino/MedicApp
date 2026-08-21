@@ -113,13 +113,16 @@ const CajaControl = () => {
                 }, config);
 
                 const balance = res.data.balance;
+                const cleanDiagnostico = balance.diferencia === 0 
+                    ? '✔️ Caja Cuadrada Perfectamente' 
+                    : (balance.diferencia > 0 ? '🚨 Sobrante en Caja' : '🚨 Faltante en Caja');
 
                 Swal.fire({
                     icon: 'success',
                     title: '🔒 Caja Cerrada Exitosamente',
                     html: `
                         <div style="text-align: left; padding: 10px; font-size: 0.95rem; line-height: 1.6;">
-                            <p><b>Diagnóstico:</b> ${balance.diagnostico}</p>
+                            <p><b>Diagnóstico:</b> ${cleanDiagnostico}</p>
                             <hr style="margin: 8px 0;"/>
                             <p>💰 <b>Apertura:</b> $${parseFloat(balance.monto_apertura).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>
                             <p>💵 <b>Efectivo Cobrado:</b> $${parseFloat(balance.total_efectivo_cobrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</p>

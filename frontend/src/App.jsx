@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import Swal from 'sweetalert2';
 import { getLoggedInUser } from './utils/auth';
+import { useInactivityTimer } from './utils/useInactivityTimer';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Footer from './components/Footer';
 
@@ -14,8 +17,8 @@ import ProfesionalList from './components/ProfesionalList';
 import ProfesionalForm from './components/ProfesionalForm';
 import UsuariosList from './components/UsuariosList';
 import UsuariosForm from './components/UsuariosForm';
-import RolList from './components/RolList'; // ✅ Nombres correctos
-import RolForm from './components/RolForm'; // ✅ Nombres correctos
+import RolList from './components/RolList'; 
+import RolForm from './components/RolForm'; 
 import TurnosList from './components/TurnosList';
 import HistorialClinico from './components/HistorialClinico';
 import TurnosForm from './components/TurnosForm';
@@ -23,6 +26,7 @@ import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
 import Soporte from './components/Soporte';
 import Privacidad from './components/Privacidad';
+import NotFound from './components/NotFound';
 
 
 import ProtectedRoute from './components/ProtectedRoute';
@@ -36,6 +40,63 @@ const MainLayout = ({ children }) => {
   const isLogin = location.pathname === '/login' 
     || location.pathname === '/forgot-password' 
     || location.pathname.startsWith('/reset-password');
+
+  // ⏱️ Activar el control de inactividad automático (15 minutos)
+  useInactivityTimer();
+
+  // 🛡️ Interceptor de Axios para capturar sesiones desplazadas por doble inicio de sesión
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response && error.response.status === 401) {
+          const code = error.response.data?.code;
+          const message = error.response.data?.message;
+
+          if (code === 'CONCURRENT_LOGIN_DISPLACED') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            Swal.fire({
+              icon: 'warning',
+              title: 'Sesión Finalizada',
+              text: message || 'Se ha iniciado sesión en otro navegador o dispositivo con este usuario.',
+              confirmButtonText: 'Entendido',
+              confirmButtonColor: '#2563eb'
+            }).then(() => {
+              navigate('/login');
+            });
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, [navigate]);
+
+  // 💓 Heartbeat de Sesión Única (cada 30 segundos comprueba si la sesión sigue activa)
+  useEffect(() => {
+    if (isLogin) return;
+
+    const checkSessionStatus = () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      axios.get('/auth/verify-session', {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {
+        // El interceptor capturará el error 401 y disparará el logout automático
+      });
+    };
+
+    // Comprobación inicial al cambiar de ruta
+    checkSessionStatus();
+
+    // Intervalo cada 30 segundos
+    const interval = setInterval(checkSessionStatus, 30000);
+    return () => clearInterval(interval);
+  }, [isLogin, location.pathname]);
 
   // ── GESTIÓN DEL PERIODO DE PRUEBA (TRIAL) ──────────────────────────────────
   const user = getLoggedInUser();
@@ -398,6 +459,9 @@ function App() {
             {/* 👇 Solo los doctores pueden entrar a esta URL 👇 */}
             <Route path="/pacientes/:paciente_id/historial" element={<HistorialClinico />} />
           </Route>
+
+          {/* Fallback para páginas no encontradas (404) */}
+          <Route path="*" element={<NotFound />} />
 
         </Routes>
       </MainLayout>

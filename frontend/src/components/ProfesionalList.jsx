@@ -150,6 +150,12 @@ const ProfesionalesList = () => {
                             <th onClick={(e) => { if (e.target.classList.contains('col-resize-handle')) return; requestSort('especialidad'); }} className="sortable-header">
                                 <div className="sort-header-content">Especialidad {getSortIcon('especialidad')}</div>
                             </th>
+                            <th onClick={(e) => { if (e.target.classList.contains('col-resize-handle')) return; requestSort('porcentaje_retencion'); }} className="sortable-header">
+                                <div className="sort-header-content">% Ret. Centro {getSortIcon('porcentaje_retencion')}</div>
+                            </th>
+                            <th onClick={(e) => { if (e.target.classList.contains('col-resize-handle')) return; requestSort('email'); }} className="sortable-header">
+                                <div className="sort-header-content">Contacto {getSortIcon('email')}</div>
+                            </th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
@@ -165,6 +171,12 @@ const ProfesionalesList = () => {
                                 <td><span className="mod-code">{prof.matricula}</span></td>
                                 <td><span className="mod-specialty">{prof.especialidad}</span></td>
                                 <td>
+                                    <span className="mod-badge" style={{ backgroundColor: '#fef2f2', color: '#991b1b', fontWeight: 'bold' }}>
+                                        {prof.porcentaje_retencion ? `${parseFloat(prof.porcentaje_retencion).toFixed(0)}%` : '20%'}
+                                    </span>
+                                </td>
+                                <td style={{ fontSize: '0.83rem' }}>{prof.email || prof.telefono || '-'}</td>
+                                <td>
                                     <div className="mod-actions">
                                         <Link to={`/profesionales/editar/${prof.id}`} className="mod-btn edit">
                                             ✏️ Editar
@@ -177,7 +189,7 @@ const ProfesionalesList = () => {
                             </tr>
                         )) : (
                             <tr className="mod-empty">
-                                <td colSpan="4">
+                                <td colSpan="6">
                                     <span className="mod-empty-icon">🩺</span>
                                     <p>No se encontraron profesionales.</p>
                                 </td>

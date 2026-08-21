@@ -251,6 +251,8 @@
 
 /* ── Table Card ─────────────────────────────────────────────────────────── */
 .mod-table-card {
+    width: 100%;
+    max-width: 100%;
     background: var(--bg-card);
     border-radius: 12px;
     box-shadow: var(--shadow-card);
@@ -653,6 +655,18 @@
     }
 }
 
+/* ── Table Responsiveness on Tablets and Mobiles (<= 1024px) ─────────────── */
+@media (max-width: 1024px) {
+    .mod-table-card {
+        overflow-x: auto !important;
+    }
+    
+    .mod-table-card table {
+        table-layout: auto !important;
+        min-width: 950px !important;
+    }
+}
+
 /* =========================================================================
    🌓 CUSTOM DARK MODE OVERRIDES FOR BOOTSTRAP COMPONENTS & FORM FIELDS
    ========================================================================= */
@@ -895,6 +909,123 @@
 .sort-icon.active {
     opacity: 1;
     color: #1a73e8;
+}
+
+/* ── Print Ticket Styling ─────────────────────────────────────────────────── */
+.ticket-print-only {
+    display: none;
+}
+
+@media print {
+    body * {
+        visibility: hidden !important;
+    }
+    
+    .ticket-print-only, .ticket-print-only * {
+        visibility: visible !important;
+    }
+
+    .ticket-print-only {
+        display: block !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 20px;
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    .ticket-box {
+        max-width: 550px;
+        margin: 0 auto;
+        border: 2px dashed #000;
+        padding: 24px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .ticket-header {
+        text-align: center;
+        margin-bottom: 12px;
+    }
+
+    .ticket-title {
+        font-size: 22px;
+        font-weight: bold;
+        margin: 0;
+        color: #000;
+    }
+
+    .ticket-subtitle {
+        font-size: 12px;
+        font-weight: bold;
+        color: #333;
+        margin-top: 4px;
+    }
+
+    .ticket-divider {
+        text-align: center;
+        font-weight: bold;
+        margin: 10px 0;
+        letter-spacing: 1px;
+    }
+
+    .ticket-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+    }
+
+    .ticket-total {
+        font-size: 17px;
+        font-weight: bold;
+        margin-top: 6px;
+    }
+
+    .ticket-section-title {
+        font-weight: bold;
+        text-align: center;
+        margin: 12px 0 6px 0;
+        font-size: 14px;
+    }
+
+    .ticket-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        margin-top: 6px;
+    }
+
+    .ticket-table th, .ticket-table td {
+        padding: 4px 2px;
+        border-bottom: 1px dotted #ccc;
+    }
+
+    .ticket-signatures {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 45px;
+        text-align: center;
+    }
+
+    .signature-col {
+        width: 42%;
+    }
+
+    .signature-line {
+        border-top: 1px solid #000;
+        margin-bottom: 6px;
+    }
+
+    .ticket-footer {
+        text-align: center;
+        font-size: 10px;
+        margin-top: 25px;
+        color: #555;
+    }
 }
 
 

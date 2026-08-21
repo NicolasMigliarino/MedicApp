@@ -183,10 +183,12 @@ async function getConnection() {
                                     t.id, t.paciente_id, t.profesional_id, t.fecha_hora_inicio, t.fecha_hora_fin, t.estado, t.motivo_consulta, t.observaciones_admin,
                                     t.recordatorio_dia_anterior_enviado AS recordatorio_enviado,
                                     pr.nombre AS profesional_nombre, pr.apellido AS profesional_apellido,
-                                    p.nombre AS paciente_nombre, p.apellido AS paciente_apellido
+                                    p.nombre AS paciente_nombre, p.apellido AS paciente_apellido,
+                                    pg.comprobante_url
                                 FROM Turnos t
                                 INNER JOIN Profesionales pr ON t.profesional_id = pr.id
                                 INNER JOIN Pacientes p ON t.paciente_id = p.id
+                                LEFT JOIN Pagos pg ON t.id = pg.turno_id
                                 WHERE 
                                     (@RolCodigo <> 'MEDICO' OR t.profesional_id = @ProfesionalID)
                                 ORDER BY t.fecha_hora_inicio DESC;
@@ -450,7 +452,360 @@ async function getConnection() {
                             END;
                         `);
 
-                        console.log('✔️ Base de Datos: Migraciones de recordatorios, sp_GetTurnos, sp_GetUsuarios, sp_SetUsuario y especialidades aplicadas.');
+                        // --- MIGRACIÓN 013: Historial de pagos y comprobantes ---
+                        await pool.request().query(`
+                            IF NOT EXISTS (
+                                SELECT * 
+                                FROM INFORMATION_SCHEMA.COLUMNS 
+                                WHERE TABLE_NAME = 'pagos' AND COLUMN_NAME = 'comprobante_url'
+                            )
+                            BEGIN
+                                ALTER TABLE dbo.pagos ADD comprobante_url NVARCHAR(255) NULL;
+                            END
+
+                            IF OBJECT_ID('dbo.pagos_profesional', 'U') IS NULL
+                            BEGIN
+                                CREATE TABLE dbo.pagos_profesional (
+                                    id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                                    profesional_id INT NOT NULL,
+                                    monto DECIMAL(10, 2) NOT NULL,
+                                    fecha_pago DATETIME NOT NULL DEFAULT GETDATE(),
+                                    fecha_desde DATE NOT NULL,
+                                    fecha_hasta DATE NOT NULL,
+                                    comprobante_url NVARCHAR(255) NULL,
+                                    usuario_registro_id INT NOT NULL,
+                                    CONSTRAINT FK_PagosProfesional_Profesionales FOREIGN KEY (profesional_id) REFERENCES dbo.profesionales(id),
+                                    CONSTRAINT FK_PagosProfesional_Usuarios FOREIGN KEY (usuario_registro_id) REFERENCES dbo.usuarios(id)
+                                );
+                            END
+                        `);
+
+                        await pool.request().query(`
+                            IF OBJECT_ID('dbo.sp_GetHistorialPagosPaciente', 'P') IS NULL
+                            BEGIN
+                                EXEC('CREATE PROCEDURE dbo.sp_GetHistorialPagosPaciente AS BEGIN SET NOCOUNT ON; SELECT 1; END;');
+                            END
+                        `);
+                        await pool.request().query(`
+                            ALTER PROCEDURE dbo.sp_GetHistorialPagosPaciente
+                                @paciente_id INT
+                            AS
+                            BEGIN
+                                SET NOCOUNT ON;
+                                SELECT 
+                                    p.id AS pago_id,
+                                    p.turno_id,
+                                    t.fecha_hora_inicio AS fecha_consulta,
+                                    prof.nombre + ' ' + prof.apellido AS profesional_nombre,
+                                    p.monto_bruto,
+                                    p.metodo_pago,
+                                    p.fecha_pago,
+                                    p.comprobante_url
+                                FROM dbo.pagos p
+                                INNER JOIN dbo.turnos t ON p.turno_id = t.id
+                                INNER JOIN dbo.profesionales prof ON t.profesional_id = prof.id
+                                WHERE t.paciente_id = @paciente_id
+                                ORDER BY p.fecha_pago DESC;
+                            END;
+                        `);
+
+                        await pool.request().query(`
+                            IF OBJECT_ID('dbo.sp_RegistrarPagoProfesional', 'P') IS NULL
+                            BEGIN
+                                EXEC('CREATE PROCEDURE dbo.sp_RegistrarPagoProfesional AS BEGIN SET NOCOUNT ON; SELECT 1; END;');
+                            END
+                        `);
+                        await pool.request().query(`
+                            ALTER PROCEDURE dbo.sp_RegistrarPagoProfesional
+                                @profesional_id INT,
+                                @monto DECIMAL(10,2),
+                                @fecha_desde DATE,
+                                @fecha_hasta DATE,
+                                @comprobante_url NVARCHAR(255) = NULL,
+                                @usuario_registro_id INT
+                            AS
+                            BEGIN
+                                SET NOCOUNT ON;
+                                INSERT INTO dbo.pagos_profesional (profesional_id, monto, fecha_pago, fecha_desde, fecha_hasta, comprobante_url, usuario_registro_id)
+                                VALUES (@profesional_id, @monto, GETDATE(), @fecha_desde, @fecha_hasta, @comprobante_url, @usuario_registro_id);
+                            END;
+                        `);
+
+                        await pool.request().query(`
+                            IF OBJECT_ID('dbo.sp_GetHistorialPagosProfesional', 'P') IS NULL
+                            BEGIN
+                                EXEC('CREATE PROCEDURE dbo.sp_GetHistorialPagosProfesional AS BEGIN SET NOCOUNT ON; SELECT 1; END;');
+                            END
+                        `);
+                        await pool.request().query(`
+                            ALTER PROCEDURE dbo.sp_GetHistorialPagosProfesional
+                                @profesional_id INT
+                            AS
+                            BEGIN
+                                SET NOCOUNT ON;
+                                SELECT 
+                                    pp.id AS pago_id,
+                                    pp.profesional_id,
+                                    pp.monto,
+                                    pp.fecha_pago,
+                                    pp.fecha_desde,
+                                    pp.fecha_hasta,
+                                    pp.comprobante_url,
+                                    u.username AS usuario_registro_nombre
+                                FROM dbo.pagos_profesional pp
+                                INNER JOIN dbo.usuarios u ON pp.usuario_registro_id = u.id
+                                WHERE pp.profesional_id = @profesional_id
+                                ORDER BY pp.fecha_pago DESC;
+                            END;
+                        `);
+
+                        await pool.request().query(`
+                            ALTER PROCEDURE [dbo].[sp_GetPaciente]
+                                @id INT
+                            AS
+                            BEGIN
+                                SET NOCOUNT ON;
+                                SELECT 
+                                    p.id, p.dni, p.nombre, p.apellido, p.fecha_nacimiento, p.telefono, p.email, p.numero_afiliado, p.fecha_alta, p.sexo, p.grupo_sanguineo, p.direccion, p.contacto_emergencia, p.alergias, p.obra_social_id,
+                                    COALESCE(
+                                        os_id.nombre,
+                                        os_code.nombre,
+                                        CASE WHEN p.obra_social IS NOT NULL AND p.obra_social <> '' AND ISNUMERIC(p.obra_social) = 0 THEN p.obra_social ELSE NULL END,
+                                        'Particular'
+                                    ) AS obra_social,
+                                    COALESCE(
+                                        os_id.nombre,
+                                        os_code.nombre,
+                                        CASE WHEN p.obra_social IS NOT NULL AND p.obra_social <> '' AND ISNUMERIC(p.obra_social) = 0 THEN p.obra_social ELSE NULL END,
+                                        'Particular'
+                                    ) AS obra_social_nombre
+                                FROM Pacientes p
+                                LEFT JOIN dbo.obras_sociales os_id ON p.obra_social_id = os_id.id
+                                LEFT JOIN dbo.obras_sociales os_code ON (ISNUMERIC(p.obra_social) = 1 AND TRY_CAST(p.obra_social AS INT) = os_code.id)
+                                WHERE p.id = @id;
+                            END;
+                        `);
+
+                        await pool.request().query(`
+                            ALTER PROCEDURE [dbo].[sp_GetPacientes]
+                              @usuario_id INT = NULL
+                            AS
+                            BEGIN
+                                SET NOCOUNT ON;
+
+                                IF @usuario_id IS NOT NULL AND EXISTS (SELECT 1 FROM profesionales WHERE usuario_id = @usuario_id)
+                                BEGIN
+                                    DECLARE @profesional_id INT;
+                                    
+                                    SELECT @profesional_id = id 
+                                    FROM profesionales 
+                                    WHERE usuario_id = @usuario_id;
+
+                                    SELECT DISTINCT 
+                                        p.id, p.dni, p.nombre, p.apellido, p.fecha_nacimiento, p.telefono, p.email, p.numero_afiliado, p.fecha_alta, p.sexo, p.grupo_sanguineo, p.direccion, p.contacto_emergencia, p.alergias, p.obra_social_id,
+                                        COALESCE(
+                                            os_id.nombre,
+                                            os_code.nombre,
+                                            CASE WHEN p.obra_social IS NOT NULL AND p.obra_social <> '' AND ISNUMERIC(p.obra_social) = 0 THEN p.obra_social ELSE NULL END,
+                                            'Particular'
+                                        ) AS obra_social,
+                                        COALESCE(
+                                            os_id.nombre,
+                                            os_code.nombre,
+                                            CASE WHEN p.obra_social IS NOT NULL AND p.obra_social <> '' AND ISNUMERIC(p.obra_social) = 0 THEN p.obra_social ELSE NULL END,
+                                            'Particular'
+                                        ) AS obra_social_nombre,
+                                        (SELECT COUNT(*) FROM dbo.turnos t_aus WHERE t_aus.paciente_id = p.id AND t_aus.estado IN ('Ausente', 'No Asistio', 'No Asistió')) AS total_ausentes
+                                    FROM Pacientes p
+                                    LEFT JOIN dbo.obras_sociales os_id ON p.obra_social_id = os_id.id
+                                    LEFT JOIN dbo.obras_sociales os_code ON (ISNUMERIC(p.obra_social) = 1 AND TRY_CAST(p.obra_social AS INT) = os_code.id)
+                                    INNER JOIN Turnos t ON p.id = t.paciente_id
+                                    WHERE t.profesional_id = @profesional_id
+                                    ORDER BY p.nombre, p.apellido;
+                                END
+                                ELSE
+                                BEGIN
+                                    SELECT 
+                                        p.id, p.dni, p.nombre, p.apellido, p.fecha_nacimiento, p.telefono, p.email, p.numero_afiliado, p.fecha_alta, p.sexo, p.grupo_sanguineo, p.direccion, p.contacto_emergencia, p.alergias, p.obra_social_id,
+                                        COALESCE(
+                                            os_id.nombre,
+                                            os_code.nombre,
+                                            CASE WHEN p.obra_social IS NOT NULL AND p.obra_social <> '' AND ISNUMERIC(p.obra_social) = 0 THEN p.obra_social ELSE NULL END,
+                                            'Particular'
+                                        ) AS obra_social,
+                                        COALESCE(
+                                            os_id.nombre,
+                                            os_code.nombre,
+                                            CASE WHEN p.obra_social IS NOT NULL AND p.obra_social <> '' AND ISNUMERIC(p.obra_social) = 0 THEN p.obra_social ELSE NULL END,
+                                            'Particular'
+                                        ) AS obra_social_nombre,
+                                        (SELECT COUNT(*) FROM dbo.turnos t_aus WHERE t_aus.paciente_id = p.id AND t_aus.estado IN ('Ausente', 'No Asistio', 'No Asistió')) AS total_ausentes
+                                    FROM Pacientes p
+                                    LEFT JOIN dbo.obras_sociales os_id ON p.obra_social_id = os_id.id
+                                    LEFT JOIN dbo.obras_sociales os_code ON (ISNUMERIC(p.obra_social) = 1 AND TRY_CAST(p.obra_social AS INT) = os_code.id)
+                                    ORDER BY p.nombre, p.apellido;
+                                END
+                            END;
+                        `);
+
+                        await pool.request().query(`
+                            ALTER PROCEDURE [dbo].[sp_RegistrarPagoTurno]
+                                @turno_id INT,
+                                @monto DECIMAL(10, 2),
+                                @metodo_pago VARCHAR(50),
+                                @usuario_registro_id INT = 1,
+                                @comprobante_url NVARCHAR(255) = NULL
+                            AS
+                            BEGIN
+                                SET NOCOUNT ON;
+                                
+                                BEGIN TRANSACTION;
+                                
+                                BEGIN TRY
+                                    IF NOT EXISTS (SELECT 1 FROM dbo.turnos WHERE id = @turno_id)
+                                    BEGIN
+                                        RAISERROR ('El turno no existe.', 16, 1);
+                                        ROLLBACK TRANSACTION;
+                                        RETURN;
+                                    END
+
+                                    IF EXISTS (SELECT 1 FROM dbo.pagos WHERE turno_id = @turno_id)
+                                    BEGIN
+                                        RAISERROR ('Esta consulta ya fue cobrada previamente por caja.', 16, 1);
+                                        ROLLBACK TRANSACTION;
+                                        RETURN;
+                                    END
+
+                                    DECLARE @profesional_id INT;
+                                    DECLARE @porcentaje_retencion DECIMAL(5,2);
+
+                                    SELECT @profesional_id = profesional_id FROM dbo.turnos WHERE id = @turno_id;
+                                    
+                                    SELECT @porcentaje_retencion = porcentaje_retencion 
+                                    FROM dbo.profesionales 
+                                    WHERE id = @profesional_id;
+
+                                    IF @porcentaje_retencion IS NULL SET @porcentaje_retencion = 20.00;
+
+                                    DECLARE @caja_diaria_id INT = NULL;
+
+                                    SELECT TOP 1 @caja_diaria_id = id 
+                                    FROM dbo.caja_diaria 
+                                    WHERE estado = 'Abierta' AND fecha = CAST(GETDATE() AS DATE)
+                                    ORDER BY id DESC;
+
+                                    INSERT INTO dbo.pagos (turno_id, caja_diaria_id, monto_bruto, porcentaje_retencion, metodo_pago, fecha_pago, usuario_registro_id, comprobante_url)
+                                    VALUES (@turno_id, @caja_diaria_id, @monto, @porcentaje_retencion, @metodo_pago, GETDATE(), @usuario_registro_id, @comprobante_url);
+
+                                    UPDATE dbo.turnos
+                                    SET estado = 'Confirmado'
+                                    WHERE id = @turno_id;
+
+                                    COMMIT TRANSACTION;
+                                    
+                                    PRINT '✔️ Pago y Comisión registrados y turno Confirmado exitosamente.';
+                                END TRY
+                                BEGIN CATCH
+                                    IF @@TRANCOUNT > 0
+                                        ROLLBACK TRANSACTION;
+                                    DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+                                    RAISERROR (@ErrorMessage, 16, 1);
+                                END CATCH
+                            END;
+                        `);
+
+                        await pool.request().query(`
+                            IF OBJECT_ID('dbo.sp_GetHistorialAsistenciaPaciente', 'P') IS NULL
+                            BEGIN
+                                EXEC('CREATE PROCEDURE dbo.sp_GetHistorialAsistenciaPaciente AS BEGIN SET NOCOUNT ON; SELECT 1; END;');
+                            END
+                        `);
+                        await pool.request().query(`
+                            ALTER PROCEDURE dbo.sp_GetHistorialAsistenciaPaciente
+                                @paciente_id INT
+                            AS
+                            BEGIN
+                                SET NOCOUNT ON;
+
+                                DECLARE @total_turnos INT = 0;
+                                DECLARE @total_asistidos INT = 0;
+                                DECLARE @total_ausentes INT = 0;
+                                DECLARE @total_cancelados INT = 0;
+                                DECLARE @total_pendientes INT = 0;
+                                DECLARE @tasa_asistencia DECIMAL(5,2) = 0.00;
+
+                                SELECT 
+                                    @total_turnos = COUNT(*),
+                                    @total_asistidos = SUM(CASE WHEN t.estado IN ('Completado', 'Confirmado') THEN 1 ELSE 0 END),
+                                    @total_ausentes = SUM(CASE WHEN t.estado IN ('Ausente', 'No Asistio', 'No Asistió') THEN 1 ELSE 0 END),
+                                    @total_cancelados = SUM(CASE WHEN t.estado = 'Cancelado' THEN 1 ELSE 0 END),
+                                    @total_pendientes = SUM(CASE WHEN t.estado = 'Pendiente' THEN 1 ELSE 0 END)
+                                FROM dbo.turnos t
+                                WHERE t.paciente_id = @paciente_id;
+
+                                IF (@total_asistidos + @total_ausentes) > 0
+                                BEGIN
+                                    SET @tasa_asistencia = CAST((@total_asistidos * 100.0) / (@total_asistidos + @total_ausentes) AS DECIMAL(5,2));
+                                END
+
+                                SELECT 
+                                    @paciente_id AS paciente_id,
+                                    @total_turnos AS total_turnos,
+                                    @total_asistidos AS total_asistidos,
+                                    @total_ausentes AS total_ausentes,
+                                    @total_cancelados AS total_cancelados,
+                                    @total_pendientes AS total_pendientes,
+                                    @tasa_asistencia AS tasa_asistencia;
+
+                                SELECT 
+                                    t.id AS turno_id,
+                                    t.fecha_hora_inicio,
+                                    t.fecha_hora_fin,
+                                    t.estado,
+                                    t.motivo_consulta,
+                                    t.observaciones_admin,
+                                    pr.nombre + ' ' + pr.apellido AS profesional_nombre,
+                                    pr.especialidad AS profesional_especialidad,
+                                    p.monto_bruto,
+                                    p.metodo_pago,
+                                    p.comprobante_url
+                                FROM dbo.turnos t
+                                INNER JOIN dbo.profesionales pr ON t.profesional_id = pr.id
+                                LEFT JOIN dbo.pagos p ON t.id = p.turno_id
+                                WHERE t.paciente_id = @paciente_id
+                                ORDER BY t.fecha_hora_inicio DESC;
+                            END;
+                        `);
+
+                        await pool.request().query(`
+                            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.usuarios') AND name = 'session_token')
+                            BEGIN
+                                ALTER TABLE dbo.usuarios ADD session_token NVARCHAR(500) NULL;
+                            END;
+                            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.usuarios') AND name = 'fecha_ultimo_acceso')
+                            BEGIN
+                                ALTER TABLE dbo.usuarios ADD fecha_ultimo_acceso DATETIME NULL;
+                            END;
+                            IF OBJECT_ID('dbo.sp_ActualizarSesionUsuario', 'P') IS NULL
+                            BEGIN
+                                EXEC('CREATE PROCEDURE dbo.sp_ActualizarSesionUsuario AS BEGIN SET NOCOUNT ON; SELECT 1; END;');
+                            END
+                        `);
+                        await pool.request().query(`
+                            ALTER PROCEDURE dbo.sp_ActualizarSesionUsuario
+                                @usuario_id INT,
+                                @session_token NVARCHAR(500)
+                            AS
+                            BEGIN
+                                SET NOCOUNT ON;
+                                UPDATE dbo.usuarios
+                                SET session_token = @session_token,
+                                    fecha_ultimo_acceso = GETDATE()
+                                WHERE id = @usuario_id;
+                            END;
+                        `);
+
+                        console.log('✔️ Base de Datos: Migraciones de recordatorios, sp_GetTurnos, sp_GetUsuarios, sp_SetUsuario, especialidades, comprobantes de pagos, historial de asistencia y control de sesión única aplicadas.');
                     } catch (migErr) {
                         migracionesRealizadas = false;
                         console.error('⚠️ Error al aplicar migraciones de recordatorios:', migErr.message);

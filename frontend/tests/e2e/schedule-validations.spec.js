@@ -18,7 +18,8 @@ function getFutureDay(dayOfWeek) {
 
 test.describe('MedCloud - Validaciones de Horario de Atención y Agenda (Rol Yanina)', () => {
 
-  test.afterEach(async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login');
     await page.evaluate(() => localStorage.clear());
   });
 

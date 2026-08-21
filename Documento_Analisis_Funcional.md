@@ -45,6 +45,14 @@ Cuando el cliente decide adquirir la versión completa del sistema, el flujo de 
 3. Una vez verificado el pago de la licencia, el equipo de soporte técnico ejecuta una actualización rápida en la base de datos (actualizando `es_trial = 0` en la tabla `configuracion_trial`).
 4. **Resultado**: El sistema se activa de inmediato para todos los usuarios del centro médico de forma transparente, eliminando los avisos del trial y desbloqueando permanentemente las funciones de registro de información.
 
+### 3.4. Control de Sesión Única y Cierre por Inactividad (Seguridad de Sesiones)
+Para proteger la información médica confidencial y prevenir accesos simultáneos no autorizados, MedCloud incorpora un mecanismo avanzado de gestión de sesiones:
+1. **Cierre Automático por Inactividad**: Un temporizador inteligente monitorea la actividad del operador en tiempo real (`mousemove`, `keydown`, `click`, `scroll`, `touchstart`). Si el usuario permanece 15 minutos sin interactuar con la plataforma, la sesión se destruye automáticamente, redirigiendo a `/login` con la alerta: *"Su sesión se ha cerrado por inactividad."*
+2. **Control de Sesión Única Simultánea (Anti-Doble Login)**:
+   * Cada vez que un usuario inicia sesión, el servidor genera un identificador de sesión único (`session_id` UUID), el cual se registra en la columna `session_token` de `dbo.usuarios` y se firma dentro del JWT.
+   * Si un usuario inicia sesión en una **segunda computadora, navegador o pestaña**, la base de datos reemplaza el `session_token` por el nuevo identificador.
+   * La primera sesión (desplazada) detectará el cambio en su siguiente solicitud o en el chequeo pasivo en segundo plano cada 30 segundos (`GET /auth/verify-session`), cerrando inmediatamente la pantalla previa con la advertencia: *"Se cerró tu sesión porque la cuenta ingresó desde otro navegador o dispositivo."*
+
 ---
 
 ## 4. Programador de Recordatorios y Agendas Automáticas (Scheduler)

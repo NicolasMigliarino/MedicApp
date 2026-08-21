@@ -1,10 +1,13 @@
 const { Router } = require('express');
-const { getPacientes,getPaciente,createPaciente,deletePaciente, setPaciente,getObrasSociales } = require('../controllers/pacientes.controllers');
+const { getPacientes,getPaciente,createPaciente,deletePaciente, setPaciente,getObrasSociales, getHistorialAsistenciaPaciente } = require('../controllers/pacientes.controllers');
 const { verificarToken } = require('../middlewares/auth.middleware');
 const router = Router();
 
 // Cuando alguien visite "/pacientes", se ejecuta la función getPacientes
 router.get('/pacientes', verificarToken, getPacientes);
+
+// Ruta para obtener el historial de asistencia del paciente
+router.get('/pacientes/:id/asistencia', verificarToken, getHistorialAsistenciaPaciente);
 
 // La Singular para editar o ver un solo paciente
 router.get('/pacientes/:id', verificarToken, getPaciente);

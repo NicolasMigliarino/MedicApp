@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('MedCloud - Restricciones del Rol Médico (doctor_nico)', () => {
 
-  test.afterEach(async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login');
     await page.evaluate(() => localStorage.clear());
   });
 

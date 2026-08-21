@@ -49,6 +49,7 @@ const formatearHorario = (fechaInicio, fechaFin) => {
 
 const TurnosList = () => {
     const [turnos, setTurnos] = useState([]);
+    const [selectedTurnos, setSelectedTurnos] = useState([]);
     const [search, setSearch] = useState('');
     const [viewMode, setViewMode] = useState('list'); // 'list' o 'calendar'
     const [sortConfig, setSortConfig] = useState({ key: 'fecha_hora_inicio', direction: 'asc' });
@@ -124,8 +125,16 @@ const TurnosList = () => {
 
     // 👇 NUEVA FUNCIÓN: El motor de cobro en recepción
     // 👇 FUNCIÓN DE COBRO (Mejorada visualmente)
+    const handleSelectTurno = (turno, isChecked) => {
+        if (isChecked) {
+            setSelectedTurnos(prev => [...prev, turno.id]);
+        } else {
+            setSelectedTurnos(prev => prev.filter(id => id !== turno.id));
+        }
+    };
+
     const handleCobrarTurno = async (turno_id) => {
-        // 1. Abrimos el popup interactivo sin barras de desplazamiento
+        // 1. Abrimos el popup interactivo sin barras de desplazamiento y con soporte de comprobante
         const { value: formValues } = await Swal.fire({
             title: '💰 Registrar Pago',
             html: `
@@ -134,7 +143,15 @@ const TurnosList = () => {
                     <input id="swal-input-monto" type="number" class="form-control" placeholder="Ej: 15000" style="margin-bottom: 20px;">
                     
                     <label style="text-align: left; display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Método de Pago</label>
-                    <select id="swal-input-metodo" class="form-select">
+                    <select id="swal-input-metodo" class="form-select" style="margin-bottom: 20px;" onchange="
+                        const val = this.value;
+                        const block = document.getElementById('comprobante-upload-block');
+                        if (val === 'Transferencia' || val === 'MercadoPago') {
+                            block.style.display = 'block';
+                        } else {
+                            block.style.display = 'none';
+                        }
+                    ">
                         <option value="Efectivo">💵 Efectivo</option>
                         <option value="MercadoPago">📱 MercadoPago / QR</option>
                         <option value="Transferencia">🏦 Transferencia Bancaria</option>
@@ -142,6 +159,11 @@ const TurnosList = () => {
                         <option value="Tarjeta Credito">💳 Tarjeta de Crédito</option>
                         <option value="Obra Social">🏥 Cubierto por Obra Social</option>
                     </select>
+
+                    <div id="comprobante-upload-block" style="display: none; text-align: left;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Adjuntar Comprobante</label>
+                        <input id="swal-input-comprobante" type="file" class="form-control" style="margin-bottom: 20px;">
+                    </div>
                 </div>
             `,
             focusConfirm: false,
@@ -152,26 +174,42 @@ const TurnosList = () => {
             preConfirm: () => {
                 const monto = document.getElementById('swal-input-monto').value;
                 const metodo = document.getElementById('swal-input-metodo').value;
+                const fileInput = document.getElementById('swal-input-comprobante');
+                const file = fileInput ? fileInput.files[0] : null;
 
                 if (!monto || monto <= 0) {
                     Swal.showValidationMessage('Por favor, ingresá un monto válido.');
                     return false;
                 }
-                return { monto: parseFloat(monto), metodo_pago: metodo };
+                if ((metodo === 'Transferencia' || metodo === 'MercadoPago') && !file) {
+                    Swal.showValidationMessage('Los pagos por transferencia o MercadoPago requieren adjuntar el comprobante.');
+                    return false;
+                }
+                return { monto: parseFloat(monto), metodo_pago: metodo, comprobante: file };
             }
         });
 
         // 2. Si la secretaria le dio a "Confirmar", enviamos todo al Backend
         if (formValues) {
             try {
-                await axios.post(`http://localhost:3000/turnos/${turno_id}/pagar`, formValues);
+                const formData = new FormData();
+                formData.append('monto', formValues.monto);
+                formData.append('metodo_pago', formValues.metodo_pago);
+                if (formValues.comprobante) {
+                    formData.append('comprobante', formValues.comprobante);
+                }
+
+                const response = await axios.post(`http://localhost:3000/turnos/${turno_id}/pagar`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+
+                const { comprobante_url } = response.data;
 
                 Swal.fire({
                     icon: 'success',
                     title: '¡Pago Registrado!',
-                    text: 'El turno pasó a estado Confirmado automáticamente.',
-                    timer: 2000,
-                    showConfirmButton: false
+                    html: `El turno pasó a estado Confirmado automáticamente.<br>${comprobante_url ? `<a href="http://localhost:3000${comprobante_url}" target="_blank" class="mod-btn" style="display: inline-block; margin-top: 15px; padding: 8px 16px; background-color: #10b981; color: white; text-decoration: none; border-radius: 4px; border: none; font-weight: bold;">🖨️ Imprimir Recibo</a>` : ''}`,
+                    showConfirmButton: true
                 });
 
                 // 3. Recargamos la lista
@@ -180,6 +218,99 @@ const TurnosList = () => {
             } catch (error) {
                 console.error(error);
                 Swal.fire('Error', 'No se pudo registrar el pago.', 'error');
+            }
+        }
+    };
+
+    const handleCobrarMultiples = async () => {
+        if (selectedTurnos.length === 0) return;
+
+        // 1. Abrimos el popup interactivo
+        const { value: formValues } = await Swal.fire({
+            title: '💰 Registrar Pago de Turnos Seleccionados',
+            html: `
+                <div style="padding: 5px 10px; overflow: hidden;">
+                    <p style="margin-bottom: 15px; font-size: 0.9rem; color: #6b7280; text-align: left;">
+                        Estás cobrando <strong>${selectedTurnos.length}</strong> turnos en lote.
+                    </p>
+                    <label style="text-align: left; display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Monto Total Abonado ($)</label>
+                    <input id="swal-input-monto" type="number" class="form-control" placeholder="Ej: 45000" style="margin-bottom: 20px;">
+                    
+                    <label style="text-align: left; display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Método de Pago</label>
+                    <select id="swal-input-metodo" class="form-select" style="margin-bottom: 20px;" onchange="
+                        const val = this.value;
+                        const block = document.getElementById('comprobante-upload-block');
+                        if (val === 'Transferencia' || val === 'MercadoPago') {
+                            block.style.display = 'block';
+                        } else {
+                            block.style.display = 'none';
+                        }
+                    ">
+                        <option value="Efectivo">💵 Efectivo</option>
+                        <option value="MercadoPago">📱 MercadoPago / QR</option>
+                        <option value="Transferencia">🏦 Transferencia Bancaria</option>
+                        <option value="Tarjeta Debito">💳 Tarjeta de Débito</option>
+                        <option value="Tarjeta Credito">💳 Tarjeta de Crédito</option>
+                        <option value="Obra Social">🏥 Cubierto por Obra Social</option>
+                    </select>
+
+                    <div id="comprobante-upload-block" style="display: none; text-align: left;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Adjuntar Comprobante</label>
+                        <input id="swal-input-comprobante" type="file" class="form-control" style="margin-bottom: 20px;">
+                    </div>
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: '✅ Confirmar Pago Lote',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#10b981',
+            preConfirm: () => {
+                const monto = document.getElementById('swal-input-monto').value;
+                const metodo = document.getElementById('swal-input-metodo').value;
+                const fileInput = document.getElementById('swal-input-comprobante');
+                const file = fileInput ? fileInput.files[0] : null;
+
+                if (!monto || monto <= 0) {
+                    Swal.showValidationMessage('Por favor, ingresá un monto total válido.');
+                    return false;
+                }
+                if ((metodo === 'Transferencia' || metodo === 'MercadoPago') && !file) {
+                    Swal.showValidationMessage('Los pagos por transferencia o MercadoPago requieren adjuntar el comprobante.');
+                    return false;
+                }
+                return { monto: parseFloat(monto), metodo_pago: metodo, comprobante: file };
+            }
+        });
+
+        if (formValues) {
+            try {
+                const formData = new FormData();
+                formData.append('monto', formValues.monto);
+                formData.append('metodo_pago', formValues.metodo_pago);
+                formData.append('turno_ids', JSON.stringify(selectedTurnos));
+                if (formValues.comprobante) {
+                    formData.append('comprobante', formValues.comprobante);
+                }
+
+                const response = await axios.post(`http://localhost:3000/turnos/pagar-multiples`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+
+                const { comprobante_url } = response.data;
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Pagos Registrados!',
+                    html: `Se registraron los cobros y los turnos fueron Confirmados.<br>${comprobante_url ? `<a href="http://localhost:3000${comprobante_url}" target="_blank" class="mod-btn" style="display: inline-block; margin-top: 15px; padding: 8px 16px; background-color: #10b981; color: white; text-decoration: none; border-radius: 4px; border: none; font-weight: bold;">🖨️ Imprimir Recibo Lote</a>` : ''}`,
+                    showConfirmButton: true
+                });
+
+                setSelectedTurnos([]);
+                loadTurnos();
+            } catch (error) {
+                console.error(error);
+                Swal.fire({ icon: 'error', title: 'Error', text: error.response?.data?.message || 'No se pudieron registrar los pagos.' });
             }
         }
     };
@@ -356,6 +487,21 @@ const TurnosList = () => {
                         <table ref={tableRef}>
                             <thead>
                                 <tr>
+                                    {userRole?.toUpperCase() !== 'MEDICO' && (
+                                        <th style={{ width: '130px', textAlign: 'center' }}>
+                                            {selectedTurnos.length > 0 ? (
+                                                <button 
+                                                    onClick={handleCobrarMultiples}
+                                                    className="mod-btn"
+                                                    style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: '#10b981', color: 'white', border: 'none', fontWeight: 'bold' }}
+                                                >
+                                                    💰 Cobrar ({selectedTurnos.length})
+                                                </button>
+                                            ) : (
+                                                'Seleccionar'
+                                            )}
+                                        </th>
+                                    )}
                                     <th onClick={(e) => { if (e.target.classList.contains('col-resize-handle')) return; requestSort('paciente'); }} className="sortable-header">
                                         <div className="sort-header-content">Paciente {getSortIcon('paciente')}</div>
                                     </th>
@@ -374,6 +520,22 @@ const TurnosList = () => {
                             <tbody>
                                 {paginatedData.length > 0 ? paginatedData.map((turno) => (
                                     <tr key={turno.id}>
+                                        {userRole?.toUpperCase() !== 'MEDICO' && (
+                                            <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                                {turno.estado?.toLowerCase() === 'pendiente' && (
+                                                    <input 
+                                                        type="checkbox"
+                                                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                        checked={selectedTurnos.includes(turno.id)}
+                                                        onChange={(e) => handleSelectTurno(turno, e.target.checked)}
+                                                        disabled={selectedTurnos.length > 0 && selectedTurnos.some(id => {
+                                                            const selTurno = turnos.find(t => t.id === id);
+                                                            return selTurno && selTurno.paciente_id !== turno.paciente_id;
+                                                        })}
+                                                    />
+                                                )}
+                                            </td>
+                                        )}
                                         <td>
                                             <div className="mod-name-chip">
                                                 <div className="mod-avatar blue">{getInitials(turno.paciente_nombre, turno.paciente_apellido)}</div>
@@ -402,7 +564,7 @@ const TurnosList = () => {
                                         </td>
                                         <td>
                                             <span className={`mod-badge ${getBadgeClass(turno.estado)}`}>
-                                                {turno.estado || 'Pendiente'}
+                                                {turno.estado?.toLowerCase() === 'confirmado' ? '✅ Confirmado (Pagado)' : (turno.estado || 'Pendiente')}
                                             </span>
                                         </td>
                                         <td>
@@ -430,6 +592,19 @@ const TurnosList = () => {
                                                         💰 Cobrar
                                                     </button>
                                                 )}
+                                                {/* Enlace al Comprobante si ya fue cobrado */}
+                                                {turno.comprobante_url && (
+                                                    <a
+                                                        href={`http://localhost:3000${turno.comprobante_url}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="mod-btn"
+                                                        style={{ backgroundColor: '#0f766e', color: 'white', borderColor: '#0f766e', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                                                        title="Ver Comprobante de Pago"
+                                                    >
+                                                        📄 Recibo
+                                                    </a>
+                                                )}
                                                 <Link to={`/turnos/editar/${turno.id}`} className="mod-btn edit">
                                                     ✏️ Editar
                                                 </Link>
@@ -441,7 +616,7 @@ const TurnosList = () => {
                                     </tr>
                                 )) : (
                                     <tr className="mod-empty">
-                                        <td colSpan="5">
+                                        <td colSpan={userRole?.toUpperCase() !== 'MEDICO' ? 6 : 5}>
                                             <span className="mod-empty-icon">📅</span>
                                             <p>No se encontraron turnos.</p>
                                         </td>
