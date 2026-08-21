@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import './modules.css';
 import useResizableColumns from './useResizableColumns';
 import { hasRole } from '../utils/auth';
+import { API_URL } from '../config';
 
 const getInitials = (nombre = '', apellido = '') =>
     `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase();
@@ -21,7 +22,7 @@ const PacientesList = () => {
 
     const fetchPacientes = async () => {
         try {
-            const response = await axios.get('http://localhost:3000/pacientes');
+            const response = await axios.get(`${API_URL}/pacientes`);
             setPacientes(response.data);
         } catch (error) {
             console.error('Error al buscar pacientes:', error);
@@ -43,7 +44,7 @@ const PacientesList = () => {
         });
         if (result.isConfirmed) {
             try {
-                await axios.delete(`http://localhost:3000/pacientes/${id}`);
+                await axios.delete(`${API_URL}/pacientes/${id}`);
                 Swal.fire({ icon: 'success', title: 'Eliminado', text: 'El paciente ha sido borrado del sistema.', timer: 1500, showConfirmButton: false });
                 fetchPacientes();
             } catch (error) {
@@ -125,7 +126,7 @@ const PacientesList = () => {
             });
 
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:3000/pagos/paciente/${paciente.id}`, {
+            const response = await axios.get(`${API_URL}/pagos/paciente/${paciente.id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const pagos = response.data;
@@ -174,7 +175,7 @@ const PacientesList = () => {
                         </td>
                         <td style="padding: 10px 12px; text-align: center; white-space: nowrap;">
                             ${p.comprobante_url ? `
-                                <a href="http://localhost:3000${p.comprobante_url}" target="_blank" style="text-decoration: none; background-color: #0f766e; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600;">📄 Ver Recibo</a>
+                                <a href="${API_URL}${p.comprobante_url}" target="_blank" style="text-decoration: none; background-color: #0f766e; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 600;">📄 Ver Recibo</a>
                             ` : '<span style="color:#9ca3af;">-</span>'}
                         </td>
                     </tr>
@@ -217,7 +218,7 @@ const PacientesList = () => {
     const handleVerAsistencia = async (paciente) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:3000/pacientes/${paciente.id}/asistencia`, {
+            const res = await axios.get(`${API_URL}/pacientes/${paciente.id}/asistencia`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 

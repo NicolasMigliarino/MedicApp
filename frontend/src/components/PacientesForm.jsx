@@ -38,12 +38,10 @@ const PacientesForm = () => {
 
     // 👇 NUEVOS ESTADOS PARA LOS ARCHIVOS
     const [archivos, setArchivos] = useState([]);
-    const [archivoSeleccionado, setArchivoSeleccionado] = useState(null);
-
-    useEffect(() => {
+    const [archivoSeleccionado, setArchivoSeleccionado] = useState(null);    useEffect(() => {
         const loadObrasSociales = async () => {
             try {
-                const response = await axios.get('http://localhost:3000/obras-sociales');
+                const response = await axios.get(`${API_URL}/obras-sociales`);
                 setObrasSociales(response.data);
             } catch (error) {
                 console.error('Error al cargar obras sociales:', error);
@@ -56,7 +54,7 @@ const PacientesForm = () => {
         const loadPaciente = async () => {
             if (id) {
                 try {
-                    const response = await axios.get(`http://localhost:3000/pacientes/${id}`);
+                    const response = await axios.get(`${API_URL}/pacientes/${id}`);
                     const pacienteData = response.data;
 
                     if (pacienteData.fecha_nacimiento) {
@@ -74,10 +72,12 @@ const PacientesForm = () => {
                     
                     if (pacienteData.obra_social_nombre) {
                         setSearchTerm(pacienteData.obra_social_nombre);
+                    } else if (pacienteData.obra_social && !/^\d+$/.test(String(pacienteData.obra_social).trim())) {
+                        setSearchTerm(pacienteData.obra_social);
                     }
 
-                    // 👇 NUEVO: CARGAR LA LISTA DE ARCHIVOS DEL PACIENTE
-                    const resArchivos = await axios.get(`http://localhost:3000/archivos/${id}`);
+                    // CARGAR LA LISTA DE ARCHIVOS DEL PACIENTE
+                    const resArchivos = await axios.get(`${API_URL}/archivos/${id}`);
                     setArchivos(resArchivos.data);
 
                 } catch (error) {
@@ -125,16 +125,16 @@ const PacientesForm = () => {
         data.append('paciente_id', id);
 
         try {
-            await axios.post('http://localhost:3000/archivos', data, {
+            await axios.post(`${API_URL}/archivos`, data, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             
             Swal.fire({ icon: 'success', title: '¡Subido!', text: 'El estudio se guardó correctamente.', timer: 1500, showConfirmButton: false });
             setArchivoSeleccionado(null);
-            document.getElementById('fileInput').value = ''; // Limpiar el input
+            document.getElementById('fileInput').value = ''; 
             
             // Recargar la lista de archivos para mostrar el nuevo
-            const resArchivos = await axios.get(`http://localhost:3000/archivos/${id}`);
+            const resArchivos = await axios.get(`${API_URL}/archivos/${id}`);
             setArchivos(resArchivos.data);
             
         } catch (error) {
@@ -146,11 +146,25 @@ const PacientesForm = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            // Resolver ID de Obra Social según el término tipeado o seleccionado
+            let finalObraSocialId = formData.obra_social_id;
+            if (searchTerm && searchTerm.trim() !== '') {
+                const matched = obrasSociales.find(o => o.nombre.toLowerCase().trim() === searchTerm.toLowerCase().trim());
+                if (matched) {
+                    finalObraSocialId = matched.id;
+                }
+            }
+
+            const payload = {
+                ...formData,
+                obra_social_id: finalObraSocialId === '' ? null : finalObraSocialId
+            };
+
             if (isEditing) {
-                await axios.put(`http://localhost:3000/pacientes/${id}`, formData);
+                await axios.put(`${API_URL}/pacientes/${id}`, payload);
                 Swal.fire({ icon: 'success', title: '¡Actualizado!', text: 'Paciente actualizado con éxito.', timer: 1500, showConfirmButton: false });
             } else {
-                await axios.post('http://localhost:3000/pacientes', formData);
+                await axios.post(`${API_URL}/pacientes`, payload);
                 Swal.fire({ icon: 'success', title: '¡Registrado!', text: 'Paciente registrado con éxito.', timer: 1500, showConfirmButton: false });
             }
             setTimeout(() => navigate('/pacientes'), 1600);
