@@ -32,7 +32,7 @@ const verificarToken = (req, res, next) => {
                 const pool = await getConnection();
                 const userRes = await pool.request()
                     .input('id', sql.Int, decoded.id)
-                    .query('SELECT session_token FROM dbo.usuarios WHERE id = @id');
+                    .query("IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.usuarios') AND name = 'session_token') SELECT session_token FROM dbo.usuarios WHERE id = @id");
 
                 if (userRes.recordset.length > 0) {
                     const activeSessionToken = userRes.recordset[0].session_token;

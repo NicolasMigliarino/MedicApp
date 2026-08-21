@@ -33,10 +33,27 @@ const login = async (req, res) => {
         // 3. Generar token único de sesión (para invalidar cualquier sesión previa en otro dispositivo)
         const session_id = crypto.randomUUID();
 
-        await pool.request()
-            .input('usuario_id', sql.Int, usuario.id)
-            .input('session_token', sql.NVarChar(500), session_id)
-            .execute('sp_ActualizarSesionUsuario');
+        try {
+            await pool.request()
+                .input('usuario_id', sql.Int, usuario.id)
+                .input('session_token', sql.NVarChar(500), session_id)
+                .query(`
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.usuarios') AND name = 'session_token')
+                    BEGIN
+                        ALTER TABLE dbo.usuarios ADD session_token NVARCHAR(500) NULL;
+                    END;
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.usuarios') AND name = 'fecha_ultimo_acceso')
+                    BEGIN
+                        ALTER TABLE dbo.usuarios ADD fecha_ultimo_acceso DATETIME NULL;
+                    END;
+                    UPDATE dbo.usuarios
+                    SET session_token = @session_token,
+                        fecha_ultimo_acceso = GETDATE()
+                    WHERE id = @usuario_id;
+                `);
+        } catch (sessErr) {
+            console.error("⚠️ No se pudo actualizar el session_token del usuario:", sessErr.message);
+        }
 
         // 4. Generación del JWT Token incluyendo session_id
         const token = jwt.sign(
