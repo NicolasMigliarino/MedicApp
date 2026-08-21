@@ -411,7 +411,10 @@ const PacientesList = () => {
                                 <td>{paciente.telefono || '-'}</td>
                                 <td>
                                     <span className="mod-badge" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: '600' }}>
-                                        🏥 {!paciente.obra_social || /^\d+$/.test(String(paciente.obra_social).trim()) ? 'Particular' : paciente.obra_social}
+                                        🏥 {(() => {
+                                            const nombreOS = paciente.obra_social_nombre || paciente.obra_social;
+                                            return (!nombreOS || /^\d+$/.test(String(nombreOS).trim())) ? 'Particular' : nombreOS;
+                                        })()}
                                     </span>
                                 </td>
                                 <td>{paciente.email}</td>
