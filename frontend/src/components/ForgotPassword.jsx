@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import './Login.css';
+import { API_URL } from '../config';
 
 // ============================================================================
 // ForgotPassword — Formulario de solicitud de recuperación de contraseña
@@ -29,7 +30,7 @@ const ForgotPassword = () => {
         setLoading(true);
 
         try {
-            await axios.post('http://localhost:3000/auth/forgot-password', { email: email.trim() });
+            await axios.post(`${API_URL}/auth/forgot-password`, { email: email.trim() });
 
             setSent(true);
             Swal.fire({

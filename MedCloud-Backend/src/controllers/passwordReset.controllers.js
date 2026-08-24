@@ -9,15 +9,16 @@ const nodemailer = require('nodemailer');
 
 // ── Configuración del transporter de email ──────────────────────────────────
 // Usa variables de entorno para la configuración SMTP.
-// Para Gmail: habilitar "App Passwords" en la cuenta de Google.
 const createTransporter = () => {
+    // Sanitizamos la contraseña de aplicación de Google eliminando espacios en blanco
+    const cleanPass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
     return nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
         port: parseInt(process.env.SMTP_PORT) || 587,
         secure: false, // true para 465, false para otros puertos
         auth: {
             user: process.env.SMTP_USER || '',
-            pass: process.env.SMTP_PASS || ''
+            pass: cleanPass
         }
     });
 };
@@ -95,7 +96,8 @@ const buildResetEmailHTML = (username, resetLink) => {
             </tr>
         </table>
     </body>
-    </html>`;
+    </html>
+    `;
 };
 
 // ============================================================================
@@ -121,6 +123,7 @@ const forgotPassword = async (req, res) => {
         // SEGURIDAD: Siempre retornar el mismo mensaje, sin importar si el email existe
         // Esto previene la enumeración de cuentas.
         if (result.recordset.length === 0) {
+            console.log(`⚠️ Solicitud de recuperación para email NO REGISTRADO: ${email}`);
             return res.json({
                 message: 'Si el email está registrado en el sistema, recibirás las instrucciones en tu bandeja de entrada.'
             });
@@ -141,8 +144,15 @@ const forgotPassword = async (req, res) => {
             .input('fecha_expiracion', sql.DateTime, fechaExpiracion)
             .execute('sp_CreatePasswordResetToken');
 
-        // Construir el link de recuperación
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        // Construir el link de recuperación de forma dinámica según la web de origen
+        let originUrl = null;
+        if (req.headers.origin) {
+            originUrl = req.headers.origin;
+        } else if (req.headers.referer) {
+            try { originUrl = new URL(req.headers.referer).origin; } catch (e) {}
+        }
+
+        const frontendUrl = process.env.FRONTEND_URL || originUrl || 'https://medcloud.ar';
         const resetLink = `${frontendUrl}/reset-password/${token}`;
 
         // Enviar el email

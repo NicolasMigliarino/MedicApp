@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import './Login.css'; // Importamos los estilos oscuros
+import './Login.css'; 
+import { API_URL } from '../config';
 
 const LoginPage = () => {
     const [loginData, setLoginData] = useState({ username: '', password: '' });
@@ -21,7 +22,7 @@ const LoginPage = () => {
     const handleLoginSubmit = async (e) => {
         e.preventDefault();
         try {
-            const res = await axios.post('http://localhost:3000/login', loginData);
+            const res = await axios.post(`${API_URL}/login`, loginData);
 
             if (res.data.user.debe_cambiar_pass) {
                 setLoggedInUser({ token: res.data.token, user: res.data.user });
@@ -64,7 +65,7 @@ const LoginPage = () => {
             return;
         }
         try {
-            await axios.put(`http://localhost:3000/usuarios/${loggedInUser.user.id}/password`, {
+            await axios.put(`${API_URL}/usuarios/${loggedInUser.user.id}/password`, {
                 newPassword: newPassword
             });
 

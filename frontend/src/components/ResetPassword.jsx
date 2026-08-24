@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import './Login.css';
+import { API_URL } from '../config';
 
 // ============================================================================
 // ResetPassword — Formulario para establecer una nueva contraseña
@@ -23,7 +24,7 @@ const ResetPassword = () => {
     useEffect(() => {
         const validate = async () => {
             try {
-                const res = await axios.post('http://localhost:3000/auth/validate-reset-token', { token });
+                const res = await axios.post(`${API_URL}/auth/validate-reset-token`, { token });
 
                 if (res.data.valid) {
                     setTokenValid(true);
@@ -73,7 +74,7 @@ const ResetPassword = () => {
         setLoading(true);
 
         try {
-            await axios.post('http://localhost:3000/auth/reset-password', {
+            await axios.post(`${API_URL}/auth/reset-password`, {
                 token,
                 newPassword
             });
